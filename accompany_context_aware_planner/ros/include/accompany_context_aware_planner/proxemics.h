@@ -61,6 +61,14 @@ public:
     ROS_INFO("Ready to provide potential proxemics based robot target pose.");
   }
 
+  struct ProcTable
+  {
+    float robotApproachOrientationId;
+    float orientation;
+    float priority;
+  };
+
+
   struct Bearing
   {
     float distance;
@@ -105,6 +113,9 @@ public:
                                       accompany_context_aware_planner::GetPotentialProxemicsLocations::Response &res);
 
   Bearing retrieveProxemicsPreferences(int userId, int robotGenericTaskId);
+
+  void retrieveProxemicsPreferences_ranking(int userId, int robotGenericTaskId,  Bearing *);
+
   Pose calculateRobotPoseFromProxemicsPreference(geometry_msgs::Pose &userPose, Bearing prefBearing);
   bool validApproachPosition(Pose personLocation, Pose robotLocation, Pose potentialApproachPose);
   void updateMapCallback(const nav_msgs::OccupancyGridConstPtr& map_msg);

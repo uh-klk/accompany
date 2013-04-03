@@ -263,6 +263,7 @@ bool Proxemics::getPotentialProxemicsLocations(
 {
   Pose targetPose;
   Bearing proxemics_bearing;
+  Bearing ranked_bearing[21];
 
   //test
   //getCurrentUserId();
@@ -278,7 +279,7 @@ bool Proxemics::getPotentialProxemicsLocations(
   ROS_INFO("robotGenericTask: %d", req.robotGenericTaskId);
 
   // Calculate robot pose in map coordinate frame
-  //stored the robot's origin in bank_link frame
+  //stored the robot's origin in base_link frame
   tf::Stamped<tf::Pose> robotOrigin = tf::Stamped<tf::Pose>(tf::Pose(tf::createQuaternionFromYaw(0),
                                                                      tf::Point(0.0, 0.0, 0.0)), ros::Time(0),
                                                             "base_link"); //base_link origin is the robot coordinate frame
@@ -299,18 +300,28 @@ bool Proxemics::getPotentialProxemicsLocations(
     ROS_ERROR("Received an exception trying to transform robot origin from \"base_link\" to \"map\": %s", ex.what());
   }
 
-  Pose robotLocation(map_frame.pose.position.x, map_frame.pose.position.y, tf::getYaw(map_frame.pose.orientation)); // calculate current robot pose
+  Pose robotLocation(map_frame.pose.position.x, map_frame.pose.position.y, tf::getYaw(map_frame.pose.orientation)); // stored the current robot pose
 
 
   //2. Retreives user's preference
   proxemics_bearing = retrieveProxemicsPreferences(req.userId, req.robotGenericTaskId);
+
+
+
+  retrieveProxemicsPreferences_ranking(req.userId, req.robotGenericTaskId, ranked_bearing);
+  for (int j=0; j<21; j++)
+  {
+    if (ranked_bearing[j].orientation != 999)
+      ROS_INFO("Ranked Bearing %d orientation is %f distance is %f",j, ranked_bearing[j].orientation, ranked_bearing[j].distance);
+  }
 
   //To do
   //multiple poses
   //search based on distance
   //search based on orientation
 
-  //3. Calculate the all the target poses from the database, where distance and orientation can be obtain from step2
+//-- for loop here to calculate each bearing
+  //3. Calculate all the target poses from the database, where distance and orientation can be obtain from step2
   targetPose = calculateRobotPoseFromProxemicsPreference(req.userPose, proxemics_bearing);
   // To do
   //multiple poses
@@ -335,6 +346,8 @@ bool Proxemics::getPotentialProxemicsLocations(
                               ros::Time::now(), "map");
     ROS_INFO("The approach position is invalid.");
   }
+//---for loop end here
+
 
   //6. Compile the respond message for the client.
   geometry_msgs::PoseStamped pose; //create a PoseStamped variable to store the StampedPost TF
@@ -376,6 +389,7 @@ Proxemics::Bearing Proxemics::retrieveProxemicsPreferences(int userId, int robot
 
   Bearing bearing;
 
+
   Driver *driver;
   Connection *con;
   Statement *stmt;
@@ -386,7 +400,6 @@ Proxemics::Bearing Proxemics::retrieveProxemicsPreferences(int userId, int robot
   con->setAutoCommit(0); // turn off the autocommit
   con->setSchema(DATABASE); // select appropriate database schema
   stmt = con->createStatement(); // create a statement object
-
 
   test = "SELECT * FROM UserProxemicPreferences where UserProxemicPreferences.userId = ";
   test += to_string(userId);
@@ -418,6 +431,7 @@ Proxemics::Bearing Proxemics::retrieveProxemicsPreferences(int userId, int robot
   while (result->next())
     bearing.distance = (float)result -> getDouble("distance");
 
+
   test = "SELECT * FROM RobotApproachOrientation where RobotApproachOrientation.robotApproachOrientationId = ";
   test += temp2;
   cout << test << endl;
@@ -441,6 +455,264 @@ Proxemics::Bearing Proxemics::retrieveProxemicsPreferences(int userId, int robot
   return bearing;
 }
 
+/******************************************************************************
+ Retrieve user's proxemics preferences from the database
+
+ *******************************************************************************/
+void Proxemics::retrieveProxemicsPreferences_ranking(int userId, int robotGenericTaskId, Bearing* rankedBearing)
+{
+  string test, temp1, temp2;
+
+  int priority = 0;
+  int k=0;
+
+  Driver *driver;
+  Connection *con;
+  Statement *stmt;
+  ResultSet *result;
+
+  ProcTable procOrientationInfo[8];
+
+  for (int h=0; h<21; h++)
+    {
+      rankedBearing[h].orientation  = 999;
+      rankedBearing[h].distance  = 999;
+    }
+
+  driver = get_driver_instance();
+  con = driver->connect(DBHOST, USER, PASSWORD); // create a database connection using the Driver
+  con->setAutoCommit(0); // turn off the autocommit
+  con->setSchema(DATABASE); // select appropriate database schema
+  stmt = con->createStatement(); // create a statement object
+
+  test = "SELECT * FROM UserProxemicPreferences where UserProxemicPreferences.userId = ";
+  test += to_string(userId);
+  test += " and UserProxemicPreferences.robotGenericTaskId = ";
+  test += to_string(robotGenericTaskId);
+  cout << test << endl;
+  result = stmt->executeQuery(test);
+
+  test = "SELECT * FROM Accompany.Proxemics where Accompany.Proxemics.proxemicId = ";
+  while (result->next())
+    test += result -> getString("proxemicId");
+
+  cout << test << endl;
+  result = stmt->executeQuery(test);
+
+  while (result->next())
+  {
+    temp1 = result -> getString("robotApproachDistanceId");
+    temp2 = result -> getString("robotApproachOrientationId");
+
+  }
+
+  test = "SELECT * FROM RobotApproachDistance where RobotApproachDistance.robotApproachDistanceId = ";
+  test += temp1;
+  cout << test << endl;
+  result = stmt->executeQuery(test);
+  while (result->next())
+  {
+    rankedBearing[0].distance = (float) result -> getDouble("distance");
+    priority = result ->getInt("priority");
+  }
+
+  test = "SELECT * FROM RobotApproachOrientation where RobotApproachOrientation.robotApproachOrientationId = ";
+  test += temp2;
+  cout << test << endl;
+  result = stmt->executeQuery(test);
+  while (result->next())
+    rankedBearing[0].orientation = (float) (result -> getDouble("orientation"));
+
+  cout << "Distance = " << rankedBearing[0].distance << " Orientation = " << rankedBearing[0].orientation << endl;
+
+  test = "SELECT * FROM RobotApproachOrientation";
+  result = stmt->executeQuery(test);
+
+  while(result->next())
+  {
+    procOrientationInfo[k].robotApproachOrientationId = result->getInt("robotApproachOrientationId");
+    procOrientationInfo[k].orientation = result->getInt("orientation");
+    procOrientationInfo[k].priority = result->getInt("priority");
+    k++;
+  }
+
+  k = 1;
+
+  float distance = 0;
+
+  for (int h = priority; h<=3; h++)
+  {
+    if (h == 1)
+      distance = 0.825;
+    else
+      if (h == 2)
+        distance = 1.5;
+      else
+        if (h == 3)
+          distance = 2;
+
+    if (k<7) //perform the first cycle of ranking then reuse for different distances
+    {
+      if (rankedBearing[0].orientation == 0) //then check id 1, then check RobotApproachOrientation id 2, 3 or 3, 2 depending on user's handedness or current robot location //front
+      //search for next bearing that fall on the same side as the preferred bearing
+      {
+        for (int j=1; j<=4; j++)  //priority, ignore the back i.e. 5
+          for (int i=0; i<8; i++) //number of data to search
+            if ((procOrientationInfo[i].orientation <= 0) && (procOrientationInfo[i].orientation > -140)) //right side, angle between -1 to -140
+              if (procOrientationInfo[i].priority == j)
+                if (procOrientationInfo[i].orientation != rankedBearing[0].orientation) //&& (procOrientationInfo[i].distance != rankedBearing[0].distance))
+                {
+                  rankedBearing[k].orientation = procOrientationInfo[i].orientation;
+                  rankedBearing[k].distance = distance;
+                  k++;
+                }
+
+        //search for next bearing that fall on the different side as the preferred bearing
+        for (int j=1; j<=4; j++)  //priority, ignore the back i.e. 5
+          for (int i=0; i<8; i++) //number of data to search
+            if ((procOrientationInfo[i].orientation > 0) && (procOrientationInfo[i].orientation < 140)) //left side, angle between 1 to 140
+              if (procOrientationInfo[i].priority == j)
+                  if (procOrientationInfo[i].orientation != rankedBearing[0].orientation)
+                  {
+                    rankedBearing[k].orientation = procOrientationInfo[i].orientation;
+                    rankedBearing[k].distance = distance;
+                    k++;
+                  }
+      }
+
+      //if (rankedBearing[0].orientation == 180)
+
+      if (rankedBearing[0].orientation > 0) // then check id 2,4,6 //left
+      {
+        //search for next bearing that fall on the different side as the preferred bearing
+        for (int j=1; j<=4; j++)  //priority, ignore the back i.e. 5
+          for (int i=0; i<8; i++) //number of data to search
+            if ((procOrientationInfo[i].orientation >= 0) && (procOrientationInfo[i].orientation < 140)) //left side, angle between 1 to 140
+              if (procOrientationInfo[i].priority == j)
+                  if (procOrientationInfo[i].orientation != rankedBearing[0].orientation)
+                  {
+                    rankedBearing[k].orientation = procOrientationInfo[i].orientation;
+                    rankedBearing[k].distance = distance;
+                    k++;
+                  }
+
+        //search for next bearing that fall on the same side as the preferred bearing
+        for (int j=1; j<=4; j++)  //priority, ignore the back i.e. 5
+          for (int i=0; i<8; i++) //number of data to search
+            if ((procOrientationInfo[i].orientation < 0) && (procOrientationInfo[i].orientation > -140)) //right side, angle between -1 to -140
+              if (procOrientationInfo[i].priority == j)
+                if (procOrientationInfo[i].orientation != rankedBearing[0].orientation) //&& (procOrientationInfo[i].distance != rankedBearing[0].distance))
+                {
+                  rankedBearing[k].orientation = procOrientationInfo[i].orientation;
+                  rankedBearing[k].distance = distance;
+                  k++;
+                }
+      }
+
+      if (rankedBearing[0].orientation < 0) // then check id 3,5,7 //right side
+      {
+        //search for next bearing that fall on the same side as the preferred bearing
+        for (int j=1; j<=4; j++)  //priority, ignore the back i.e. 5
+          for (int i=0; i<8; i++) //number of data to search
+            if ((procOrientationInfo[i].orientation <= 0) && (procOrientationInfo[i].orientation > -140)) //right side, angle between -1 to -140
+              if (procOrientationInfo[i].priority == j)
+                if (procOrientationInfo[i].orientation != rankedBearing[0].orientation) //&& (procOrientationInfo[i].distance != rankedBearing[0].distance))
+                {
+                  rankedBearing[k].orientation = procOrientationInfo[i].orientation;
+                  rankedBearing[k].distance = distance;
+                  k++;
+                }
+
+
+        //search for next bearing that fall on the different side as the preferred bearing
+        for (int j=1; j<=4; j++)  //priority, ignore the back i.e. 5
+          for (int i=0; i<8; i++) //number of data to search
+            if ((procOrientationInfo[i].orientation > 0) && (procOrientationInfo[i].orientation < 140)) //left side, angle between 1 to 140
+              if (procOrientationInfo[i].priority == j)
+                  if (procOrientationInfo[i].orientation != rankedBearing[0].orientation)
+                  {
+                    rankedBearing[k].orientation = procOrientationInfo[i].orientation;
+                    rankedBearing[k].distance = distance;
+                    k++;
+                  }
+      }
+    }
+  else
+    for (int i=0; i<7; i++)
+    {
+      rankedBearing[k].orientation = rankedBearing[k-7].orientation;
+      rankedBearing[k].distance = distance;
+      k++;
+    }
+  }
+
+  for (int j=0; j<21; j++)
+  {
+    if (rankedBearing[j].orientation != 999)
+      cout<<"Ranked Bearing "<<j<<" orientation is "<<rankedBearing[j].orientation<<", distance is "<<rankedBearing[j].distance<< endl;
+  }
+  /* Simulated user's pose. The actual user's pose will be provided by the caller*/
+  // geometry_msgs::Pose userPose;
+  // userPose.orientation = tf::createQuaternionMsgFromYaw( degree2radian(87.6) ); //create Quaternion Msg from Yaw
+  // tf::pointTFToMsg(tf::Point(1, 1, 0), userPose.position);
+
+  delete result;
+  delete stmt;
+  con -> close();
+  delete con;
+
+//  return bearing;
+}
+
+/*first calculate the possible pose then eliminate and rearranged based on closest distance.
+
+id = 3
+
+if id.orientation = 0, then check id 1, then check RobotApproachOrientation id 2, 3 or 3, 2 depending on user's handedness or current robot location //front
+
+if id.orientation > 0, then check id 2,4,6 //left
+
+
+if id.orientation < 0, then check id 3,5,7 //right side
+  stored the current bearing
+  search for next bearing
+
+
+  for (j=1; j<=4, j++)  //priority
+    for (i=0; i<8; i++) //number of data to search
+      if orientation < 0 orientation > -140 //right side, angle between -1 to -140
+        if priority == j && id !=id.orientation
+          stored current bearing.
+          break;
+
+  for (j=1; j<=4, j++)
+    for (i=0; i<8; i++)
+     if orientation > 0 orientation < 140 //left side, angle between 1 to 140
+        if priority == j
+          stored current bearing.
+          break;
+
+
+if id.orientation = (+/-) 180 //back
+
+
+
+1,2,3 for orientation, for another orientation
+  id is 3 = front right default = -45, -90,     0,   +45, +90         D = 1.5m
+                                = -45, -90,     0,   +45, +90         D = 2m
+
+  id is 5 = side right default  = -90, -45,  -135,  0
+//id is
+
+if orientation = 0, then check id 1, then check RobotApproachOrientation id 2, 3 or 3, 2 depending on user's handedness or current robot location //front
+
+
+if orientation >=0, then check id 2,4,6 //left
+
+if orientation <=0, then check id 3,5,7 //right side
+
+if orientation = (+/-) 180 //back
+*/
 /******************************************************************************
  Calculate the the robot's target pose relative to the user's pose, based on
  the user's proxemics preference
