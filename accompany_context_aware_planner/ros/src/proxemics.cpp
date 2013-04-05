@@ -304,55 +304,62 @@ bool Proxemics::getPotentialProxemicsLocations(
 
 
   //2. Retreives user's preference
-  proxemics_bearing = retrieveProxemicsPreferences(req.userId, req.robotGenericTaskId);
-
-
-
+  //proxemics_bearing = retrieveProxemicsPreferences(req.userId, req.robotGenericTaskId);
   retrieveProxemicsPreferences_ranking(req.userId, req.robotGenericTaskId, ranked_bearing);
-  for (int j=0; j<21; j++)
+/*  for (int j=0; j<21; j++)
   {
     if (ranked_bearing[j].orientation != 999)
-      ROS_INFO("Ranked Bearing %d orientation is %f distance is %f",j, ranked_bearing[j].orientation, ranked_bearing[j].distance);
+      ROS_INFO("Ranked Bearing %d orientation is %f distance is %f",j, radian2degree(ranked_bearing[j].orientation), ranked_bearing[j].distance);
   }
-
+*/
   //To do
-  //multiple poses
   //search based on distance
   //search based on orientation
-
-//-- for loop here to calculate each bearing
-  //3. Calculate all the target poses from the database, where distance and orientation can be obtain from step2
-  targetPose = calculateRobotPoseFromProxemicsPreference(req.userPose, proxemics_bearing);
-  // To do
-  //multiple poses
-
-  //4. Eliminate target poses that could not be occupied by the robot based on static map (i.e. too close to obstacle or on obstacle)
-  //   Eliminate target poses that could not be reach by the robot based on static map
-  bool validApproach = validApproachPosition(personLocation, robotLocation, targetPose);
-
-  //5. Elimimate target poses that are not in the same location as the user (i.e. user is in living room, therefore all potential robot poses have to be in the living room for HRI)
   tf::Stamped<tf::Pose> p;
-  if (validApproach == true)
+
+  for(int i=0; i<21; i++)
   {
-    p = tf::Stamped<tf::Pose>(tf::Pose(tf::createQuaternionFromYaw(targetPose.orientation),
-                                       tf::Point(targetPose.x, targetPose.y, 0.0)), ros::Time::now(), "map");
-    ROS_INFO("The approach position is valid.");
-  }
-  else
-  {
-    //return robot current pose as temporary solution
-    p = tf::Stamped<tf::Pose>(tf::Pose(tf::createQuaternionFromYaw(tf::getYaw(map_frame.pose.orientation)),
-                                       tf::Point(map_frame.pose.position.x, map_frame.pose.position.y, 0.0)),
-                              ros::Time::now(), "map");
-    ROS_INFO("The approach position is invalid.");
-  }
-//---for loop end here
+    if (ranked_bearing[i].orientation == 999)
+      i=21;     //21 possible approach target' poses, ignoring the back approach.
+    else
+    {   //calculate each bearing
+      proxemics_bearing = ranked_bearing[i];
+      //ROS_INFO("Ranked Bearing %d orientation is %f distance is %f",i, radian2degree(proxemics_bearing.orientation), proxemics_bearing.distance);
+
+      //3. Calculate all the target poses from the database, where distance and orientation can be obtain from step2
+      targetPose = calculateRobotPoseFromProxemicsPreference(req.userPose, proxemics_bearing);
 
 
-  //6. Compile the respond message for the client.
-  geometry_msgs::PoseStamped pose; //create a PoseStamped variable to store the StampedPost TF
-  tf::poseStampedTFToMsg(p, pose); //convert the PoseStamped data into message format and store in pose
-  res.targetPoses.push_back(pose); //push the pose message into the respond vector to be send back to the client
+      //4. Eliminate target poses that could not be occupied by the robot based on static map (i.e. too close to obstacle or on obstacle)
+      //   Eliminate target poses that could not be reach by the robot based on static map
+      //5. Elimimate target poses that are not in the same location as the user (i.e. user is in living room, therefore all potential robot poses have to be in the living room for HRI)
+      bool validApproach = validApproachPosition(personLocation, robotLocation, targetPose);
+
+      if (validApproach == true)
+      {
+        p = tf::Stamped<tf::Pose>(tf::Pose(tf::createQuaternionFromYaw(targetPose.orientation),
+                                           tf::Point(targetPose.x, targetPose.y, 0.0)), ros::Time::now(), "map");
+        ROS_INFO("Ranked Bearing %d orientation is %f distance is %f",i, radian2degree(proxemics_bearing.orientation), proxemics_bearing.distance);
+        ROS_INFO("The approach position is valid+++++++++++++++++++++++++++++++++++++++++++++++++");
+
+        //6. Compile the respond message for the client.
+         geometry_msgs::PoseStamped pose; //create a PoseStamped variable to store the StampedPost TF
+         tf::poseStampedTFToMsg(p, pose); //convert the PoseStamped data into message format and store in pose
+         res.targetPoses.push_back(pose); //push the pose message into the respond vector to be send back to the client
+      }
+      else
+      {
+        //return robot current pose as temporary solution
+        /*p = tf::Stamped<tf::Pose>(tf::Pose(tf::createQuaternionFromYaw(tf::getYaw(map_frame.pose.orientation)),
+                                           tf::Point(map_frame.pose.position.x, map_frame.pose.position.y, 0.0)),
+                                  ros::Time::now(), "map");
+        */
+        ROS_INFO("Ranked Bearing %d orientation is %f distance is %f",i, radian2degree(proxemics_bearing.orientation), proxemics_bearing.distance);
+        ROS_INFO("The approach position is invalid----------------");
+      }
+    }
+  }
+
 
   ROS_INFO("Sending request out");
   /*The respond vector data from the server are in the following format and contain a list of potential target locations.
@@ -473,7 +480,7 @@ void Proxemics::retrieveProxemicsPreferences_ranking(int userId, int robotGeneri
 
   ProcTable procOrientationInfo[8];
 
-  for (int h=0; h<21; h++)
+  for (int h=0; h<21; h++) //init the arrays
     {
       rankedBearing[h].orientation  = 999;
       rankedBearing[h].distance  = 999;
@@ -521,9 +528,9 @@ void Proxemics::retrieveProxemicsPreferences_ranking(int userId, int robotGeneri
   cout << test << endl;
   result = stmt->executeQuery(test);
   while (result->next())
-    rankedBearing[0].orientation = (float) (result -> getDouble("orientation"));
+    rankedBearing[0].orientation = (float) degree2radian((result -> getDouble("orientation")));
 
-  cout << "Distance = " << rankedBearing[0].distance << " Orientation = " << rankedBearing[0].orientation << endl;
+  cout << "Distance = " << rankedBearing[0].distance << " Orientation = " << radian2degree(rankedBearing[0].orientation) << endl;
 
   test = "SELECT * FROM RobotApproachOrientation";
   result = stmt->executeQuery(test);
@@ -531,7 +538,7 @@ void Proxemics::retrieveProxemicsPreferences_ranking(int userId, int robotGeneri
   while(result->next())
   {
     procOrientationInfo[k].robotApproachOrientationId = result->getInt("robotApproachOrientationId");
-    procOrientationInfo[k].orientation = result->getInt("orientation");
+    procOrientationInfo[k].orientation = degree2radian(result->getInt("orientation"));
     procOrientationInfo[k].priority = result->getInt("priority");
     k++;
   }
@@ -553,12 +560,12 @@ void Proxemics::retrieveProxemicsPreferences_ranking(int userId, int robotGeneri
 
     if (k<7) //perform the first cycle of ranking then reuse for different distances
     {
-      if (rankedBearing[0].orientation == 0) //then check id 1, then check RobotApproachOrientation id 2, 3 or 3, 2 depending on user's handedness or current robot location //front
-      //search for next bearing that fall on the same side as the preferred bearing
+      if (rankedBearing[0].orientation == degree2radian(0)) //then check id 1, then check RobotApproachOrientation id 2, 3 or 3, 2 depending on user's handedness or current robot location //front
       {
+        //search for next bearing that fall on right side
         for (int j=1; j<=4; j++)  //priority, ignore the back i.e. 5
           for (int i=0; i<8; i++) //number of data to search
-            if ((procOrientationInfo[i].orientation <= 0) && (procOrientationInfo[i].orientation > -140)) //right side, angle between -1 to -140
+            if ((procOrientationInfo[i].orientation <= degree2radian(0)) && (procOrientationInfo[i].orientation > degree2radian(-140))) //right side, angle between -1 to -140
               if (procOrientationInfo[i].priority == j)
                 if (procOrientationInfo[i].orientation != rankedBearing[0].orientation) //&& (procOrientationInfo[i].distance != rankedBearing[0].distance))
                 {
@@ -567,10 +574,10 @@ void Proxemics::retrieveProxemicsPreferences_ranking(int userId, int robotGeneri
                   k++;
                 }
 
-        //search for next bearing that fall on the different side as the preferred bearing
+        //search for next bearing that fall on a different side
         for (int j=1; j<=4; j++)  //priority, ignore the back i.e. 5
           for (int i=0; i<8; i++) //number of data to search
-            if ((procOrientationInfo[i].orientation > 0) && (procOrientationInfo[i].orientation < 140)) //left side, angle between 1 to 140
+            if ((procOrientationInfo[i].orientation > degree2radian(0)) && (procOrientationInfo[i].orientation < degree2radian(140))) //left side, angle between 1 to 140
               if (procOrientationInfo[i].priority == j)
                   if (procOrientationInfo[i].orientation != rankedBearing[0].orientation)
                   {
@@ -582,12 +589,12 @@ void Proxemics::retrieveProxemicsPreferences_ranking(int userId, int robotGeneri
 
       //if (rankedBearing[0].orientation == 180)
 
-      if (rankedBearing[0].orientation > 0) // then check id 2,4,6 //left
+      else if (rankedBearing[0].orientation > degree2radian(0)) // then check id 2,4,6 //left
       {
         //search for next bearing that fall on the different side as the preferred bearing
         for (int j=1; j<=4; j++)  //priority, ignore the back i.e. 5
           for (int i=0; i<8; i++) //number of data to search
-            if ((procOrientationInfo[i].orientation >= 0) && (procOrientationInfo[i].orientation < 140)) //left side, angle between 1 to 140
+            if ((procOrientationInfo[i].orientation >= degree2radian(0)) && (procOrientationInfo[i].orientation < degree2radian(140))) //left side, angle between 1 to 140
               if (procOrientationInfo[i].priority == j)
                   if (procOrientationInfo[i].orientation != rankedBearing[0].orientation)
                   {
@@ -599,7 +606,7 @@ void Proxemics::retrieveProxemicsPreferences_ranking(int userId, int robotGeneri
         //search for next bearing that fall on the same side as the preferred bearing
         for (int j=1; j<=4; j++)  //priority, ignore the back i.e. 5
           for (int i=0; i<8; i++) //number of data to search
-            if ((procOrientationInfo[i].orientation < 0) && (procOrientationInfo[i].orientation > -140)) //right side, angle between -1 to -140
+            if ((procOrientationInfo[i].orientation < degree2radian(0)) && (procOrientationInfo[i].orientation > degree2radian(-140))) //right side, angle between -1 to -140
               if (procOrientationInfo[i].priority == j)
                 if (procOrientationInfo[i].orientation != rankedBearing[0].orientation) //&& (procOrientationInfo[i].distance != rankedBearing[0].distance))
                 {
@@ -609,12 +616,12 @@ void Proxemics::retrieveProxemicsPreferences_ranking(int userId, int robotGeneri
                 }
       }
 
-      if (rankedBearing[0].orientation < 0) // then check id 3,5,7 //right side
+      else if (rankedBearing[0].orientation < degree2radian(0)) // then check id 3,5,7 //right side
       {
         //search for next bearing that fall on the same side as the preferred bearing
         for (int j=1; j<=4; j++)  //priority, ignore the back i.e. 5
           for (int i=0; i<8; i++) //number of data to search
-            if ((procOrientationInfo[i].orientation <= 0) && (procOrientationInfo[i].orientation > -140)) //right side, angle between -1 to -140
+            if ((procOrientationInfo[i].orientation <= degree2radian(0)) && (procOrientationInfo[i].orientation > degree2radian(-140))) //right side, angle between -1 to -140
               if (procOrientationInfo[i].priority == j)
                 if (procOrientationInfo[i].orientation != rankedBearing[0].orientation) //&& (procOrientationInfo[i].distance != rankedBearing[0].distance))
                 {
@@ -627,7 +634,7 @@ void Proxemics::retrieveProxemicsPreferences_ranking(int userId, int robotGeneri
         //search for next bearing that fall on the different side as the preferred bearing
         for (int j=1; j<=4; j++)  //priority, ignore the back i.e. 5
           for (int i=0; i<8; i++) //number of data to search
-            if ((procOrientationInfo[i].orientation > 0) && (procOrientationInfo[i].orientation < 140)) //left side, angle between 1 to 140
+            if ((procOrientationInfo[i].orientation > degree2radian(0)) && (procOrientationInfo[i].orientation < degree2radian(140))) //left side, angle between 1 to 140
               if (procOrientationInfo[i].priority == j)
                   if (procOrientationInfo[i].orientation != rankedBearing[0].orientation)
                   {
@@ -638,7 +645,7 @@ void Proxemics::retrieveProxemicsPreferences_ranking(int userId, int robotGeneri
       }
     }
   else
-    for (int i=0; i<7; i++)
+    for (int i=0; i<7; i++) //copy the rank list
     {
       rankedBearing[k].orientation = rankedBearing[k-7].orientation;
       rankedBearing[k].distance = distance;
@@ -649,7 +656,7 @@ void Proxemics::retrieveProxemicsPreferences_ranking(int userId, int robotGeneri
   for (int j=0; j<21; j++)
   {
     if (rankedBearing[j].orientation != 999)
-      cout<<"Ranked Bearing "<<j<<" orientation is "<<rankedBearing[j].orientation<<", distance is "<<rankedBearing[j].distance<< endl;
+      cout<<"Ranked Bearing "<<j<<" orientation is "<<radian2degree(rankedBearing[j].orientation)<<", distance is "<<rankedBearing[j].distance<< endl;
   }
   /* Simulated user's pose. The actual user's pose will be provided by the caller*/
   // geometry_msgs::Pose userPose;
@@ -661,7 +668,6 @@ void Proxemics::retrieveProxemicsPreferences_ranking(int userId, int robotGeneri
   con -> close();
   delete con;
 
-//  return bearing;
 }
 
 /*first calculate the possible pose then eliminate and rearranged based on closest distance.

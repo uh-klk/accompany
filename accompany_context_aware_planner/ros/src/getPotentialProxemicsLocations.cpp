@@ -22,7 +22,7 @@ float degree2radian(float degree)
   return radian = pi * degree / 180.0;
 }
 
-void gotoTarget(float x, float y, float theta)
+bool gotoTarget(float x, float y, float theta)
 {
 
   typedef actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> MoveBaseClient;
@@ -49,10 +49,12 @@ void gotoTarget(float x, float y, float theta)
   if (ac.getState() == actionlib::SimpleClientGoalState::SUCCEEDED)
   {
     ROS_INFO("Hooray, robot reached the goal");
+    return 1;
   }
   else
   {
     ROS_INFO("robot failed to reach goal some reason");
+    return 0;
   }
 }
 
@@ -99,6 +101,8 @@ int main(int argc, char **argv)
        srv.response.targetPoses[i].pose.position.z
        */
 
+      ROS_INFO("Response target Poses size is:  x=%d", srv.response.targetPoses.size());
+
       ROS_INFO("Request is:  x=%f, y=%f, z=%f yaw = %f",
           srv.request.userPose.position.x,
           srv.request.userPose.position.y,
@@ -116,8 +120,10 @@ int main(int argc, char **argv)
           srv.response.targetPoses[i].pose.position.z,
           tf::getYaw(srv.response.targetPoses[i].pose.orientation));
 
-      gotoTarget(srv.response.targetPoses[i].pose.position.x, srv.response.targetPoses[i].pose.position.y,
-                 tf::getYaw(srv.response.targetPoses[i].pose.orientation));
+
+      if (gotoTarget(srv.response.targetPoses[i].pose.position.x, srv.response.targetPoses[i].pose.position.y,
+                 tf::getYaw(srv.response.targetPoses[i].pose.orientation)) == true)
+        i = srv.response.targetPoses.size();
 
     }
 
