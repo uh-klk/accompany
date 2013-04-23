@@ -7,6 +7,8 @@
 #define PASSWORD "waterloo"
 #define DATABASE "Accompany"
 
+
+
 int main(int argc, char * argv[])
 {
   ros::init(argc, argv, "context_aware_planner_server");
@@ -30,5 +32,9 @@ int main(int argc, char * argv[])
     else if (!str.compare("Y2"))
           ros::spin();
   }
+  else
+    ROS_INFO("usage:    'accompany_context_aware_planner Y1' for year 1 context aware planner implementation");
+    ROS_INFO("          'accompany_context_aware_planner Y2' for year 2 context aware planner implementation");
+
   return 0;
 }
