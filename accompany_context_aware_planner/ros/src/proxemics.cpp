@@ -33,179 +33,6 @@ float Proxemics::radian2degree(float radian)
   return degree = 180 * radian / pi;
 }
 
-/*
- * Temp function for Y1 context aware proxemics i.e. sofa position
- */
-void Proxemics::getPotentialProxemicsLocations_Sofa_Y1(void) //retrieves current user (who)
-{
-
-  string sql;
-  int currentUserId;
-  string currentUserPosture;
-  int currentUserLocationId;
-
-  Driver *driver;
-  Connection *con;
-  Statement *stmt;
-  ResultSet *result;
-
-  driver = get_driver_instance();
-  con = driver->connect(DBHOST, USER, PASSWORD); // create a database connection using the Driver
-  //con->setAutoCommit(0); // turn off the autocommit
-  con->setSchema(DATABASE); // select appropriate database schema
-  stmt = con->createStatement(); // create a statement object
-
-
-  sql = "SELECT sc.SessionUser FROM SessionControl sc";
-  result = stmt->executeQuery(sql);
-
-  while (result->next())
-    currentUserId = result->getInt("SessionUser");
-
-  cout << "**********Current user id is = " << currentUserId << endl;
-
-  sql = "SELECT P.poseType from Pose P, Users U WHERE P.poseId = U.poseId AND U.userId = ";
-  sql += to_string(currentUserId);
-  cout << sql << endl;
-  result = stmt->executeQuery(sql);
-  while (result->next())
-    currentUserPosture = result->getString("poseType");
-
-  cout << "**********Current user posture is = " << currentUserPosture << endl;
-
-  //if user is in living room then the sensors trigger must be user's action
-
-  sql = "SELECT L.locationId from Locations L where L.name = 'Living Room'";
-  cout << sql << endl;
-  result = stmt->executeQuery(sql);
-  while (result->next())
-    currentUserLocationId = result->getInt("locationId");
-  cout << "**********Current user location id is = " << currentUserLocationId << endl;
-
-  sql = "call spCheckUserLocation( ";
-  sql += to_string(currentUserId);
-  sql += ",";
-  sql += to_string(currentUserLocationId);
-  sql += ",";
-  sql += "@res)";
-  cout << sql << endl;
-
-  if (stmt->execute(sql)) // return row count, if rowcnt >= 1 user is in Living Room
-  {
-    delete result;
-    delete stmt;
-    con -> close();
-    delete con;
-
-    //driver = get_driver_instance();
-    con = driver->connect(DBHOST, USER, PASSWORD); // create a database connection using the Driver
-    con->setAutoCommit(0); // turn off the autocommit
-    con->setSchema(DATABASE); // select appropriate database schema
-    stmt = con->createStatement(); // create a statement object
-
-    cout << "user is in living room" << endl; //check which sofa the user is sitting
-
-    sql = "SELECT * FROM Sensors S where S.name like 'Sofa%' ";
-    cout << sql << endl;
-    cout << "test!!!!" << endl;
-
-    result = stmt->executeQuery(sql);
-
-    while (result->next())
-      if ((int)result->getDouble("value")) //check if sensor is on
-      {
-        switch (result->getInt("sensorId"))
-        {
-          case 15:
-            cout << "sofa 15 is occupied" << endl;
-            //Pose robot1TargetPose(3.613, 1.29, degree2radian(40));
-            sql = "UPDATE Locations SET Locations.xCoord = ";
-            sql += to_string(3.613);
-            sql += ", ";
-            sql += "Locations.yCoord = ";
-            sql += to_string(1.29);
-            sql += ", ";
-            sql += "Locations.orientation = ";
-            sql += to_string(40);
-            sql += " WHERE Locations.locationId = 999";
-            cout << sql << endl;
-            stmt->executeUpdate(sql);
-            break;
-          case 16:
-            cout << "sofa 16 is occupied" << endl;
-            //robotTargetPose(4.158, 0.952, degree2radian(49));
-            sql = "UPDATE Locations SET Locations.xCoord = ";
-            sql += to_string(4.158);
-            sql += ", ";
-            sql += "Locations.yCoord = ";
-            sql += to_string(0.952);
-            sql += ", ";
-            sql += "Locations.orientation = ";
-            sql += to_string(49);
-            sql += " WHERE Locations.locationId = 999";
-            cout << sql << endl;
-            stmt->executeUpdate(sql);
-            break;
-          case 17:
-            cout << "sofa 17 is occupied" << endl;
-            //robotTargetPose(4.158, 0.952, degree2radian(42));
-            sql = "UPDATE Locations SET Locations.xCoord = ";
-            sql += to_string(4.158);
-            sql += ", ";
-            sql += "Locations.yCoord = ";
-            sql += to_string(0.952);
-            sql += ", ";
-            sql += "Locations.orientation = ";
-            sql += to_string(42);
-            sql += " WHERE Locations.locationId = 999";
-            cout << sql << endl;
-            stmt->executeUpdate(sql);
-            break;
-          case 18:
-            cout << "sofa 18 is occupied" << endl;
-            //robotTargetPose(4.158, 0.952, degree2radian(7));
-            sql = "UPDATE Locations SET Locations.xCoord = ";
-            sql += to_string(4.158);
-            sql += ", ";
-            sql += "Locations.yCoord = ";
-            sql += to_string(0.952);
-            sql += ", ";
-            sql += "Locations.orientation = ";
-            sql += to_string(7);
-            sql += " WHERE Locations.locationId = 999";
-            cout << sql << endl;
-            stmt->executeUpdate(sql);
-            break;
-          case 19:
-            cout << "sofa 19 is occupied" << endl;
-            //robotTargetPose(4.257, 0.835, degree2radian(0));
-            sql = "UPDATE Locations SET Locations.xCoord = ";
-            sql += to_string(4.257);
-            sql += ", ";
-            sql += "Locations.yCoord = ";
-            sql += to_string(0.835);
-            sql += ", ";
-            sql += "Locations.orientation = ";
-            sql += to_string(0);
-            sql += " WHERE Locations.locationId = 999";
-            cout << sql << endl;
-            stmt->executeUpdate(sql);
-            break;
-          default:
-            break;
-        }
-      }
-  }
-  else
-    cout << "not in location";
-
-  delete result;
-  delete stmt;
-  con -> close();
-  delete con;
-
-}
-
 /******************************************************************************
  * This function return the radius of the user at the specified angle in user's frame
  * The user is modelled as an ellipse therefore have shorter radius in front than sides
@@ -221,7 +48,7 @@ float Proxemics::getUserRadius(float thetaInRadian, float halfShoulderWidth, flo
 
   rad = thetaInRadian;
 
-  //Polar form relative to center formula from see http://en.wikipedia.org/wiki/Ellipse#Polar_form_relative_to_center
+  //Polar form relative to centre formula from see http://en.wikipedia.org/wiki/Ellipse#Polar_form_relative_to_center
   //use to calculate the radius
   userRadius = (a * b / sqrt(pow(b * cos(rad), 2) + pow(a * sin(rad), 2)));
 
@@ -235,38 +62,57 @@ float Proxemics::getUserRadius(float thetaInRadian, float halfShoulderWidth, flo
  req.header.seq      - can be used to stored id of the client and be return
  to the client for identification etc. if needed
  (needed to be verify if this is necessary)
- req.header.stamp    - time stamped when the request is created i.e. ros::Time::now()
- req.header.frame_id - the user coordinate's reference frame i.e. "map"
 
- req.userId          - the user's Id in the database
- req.userPosture     - the user's posture i.e. standing/seating
+  req.header.stamp    - time stamped when the request is created i.e. ros::Time::now()
+  req.header.frame_id - the user coordinate's reference frame i.e. "map"
+
+  req.userId          - the user's Id in the database
+  req.userPosture     - the user's posture i.e. standing/seating
 
  //User's coordinate i.e. in map's coordinate frame in meter
- req.userPose.position.x      - the x coordinate of the user
- req.userPose.position.y      - the y coordinate of the user
- req.userPose.position.z      - the z coordinate of the user
+  req.userPose.position.x      - the x coordinate of the user
+  req.userPose.position.y      - the y coordinate of the user
+  req.userPose.position.z      - the z coordinate of the user
 
  // User's orientation in Quaternion. the heading direction of the user can be extract
  // by using tf::getYaw(req.userPose.orientation) function which return yaw in radian
- req.userPose.orientation.x
- req.userPose.orientation.y
- req.userPose.orientation.z
- req.userPose.orientation.w
+  req.userPose.orientation.x
+  req.userPose.orientation.y
+  req.userPose.orientation.z
+  req.userPose.orientation.w
 
  //Type of task the robot is going to perform using this information
- req.robotGenericTaskId       - the type of task the robot is going to perform using this proxemics
+  req.robotGenericTaskId       - the type of task the robot is going to perform using this proxemics
+
+ The respond vector data from the server are in the following format and contain a list of potential target locations.
+ These potential target poses needed to be varify in the real environment to take into account of dynamic obstacles etc.
+
+  res.targetPoses[i].seq
+  res.targetPoses[i].stamp
+  res.targetPoses[i].frame_id
+
+  res.targetPoses[i].pose.x
+  res.targetPoses[i].pose.y
+  res.targetPoses[i].pose.z
+
+  res.targetPoses[i].orientation.x
+  res.targetPoses[i].orientation.y
+  res.targetPoses[i].orientation.z
+  res.targetPoses[i].orientation.w
 
  ******************************************************************************/
 bool Proxemics::getPotentialProxemicsLocations(
                                                accompany_context_aware_planner::GetPotentialProxemicsLocations::Request &req,
                                                accompany_context_aware_planner::GetPotentialProxemicsLocations::Response &res)
 {
-  Pose targetPose;
+  Pose targetPose, robotLocation;
   Bearing proxemics_bearing;
   Bearing ranked_bearing[21];
 
-  //test
-  //getCurrentUserId();
+  int validDataCount = 0;
+  tf::Stamped<tf::Pose> p;
+
+  SQL_error = false; //set the SQL error flag to false before begin processing
 
   //1. Process the request data from the client.
   //ROS_INFO("MsgSeq = %d, time =  %li, coordinate frame = %s ",req.header.seq, static_cast<long>(ros::Time::now().toNSec()-req.header.stamp.toNSec()), req.header.frame_id.c_str());
@@ -278,124 +124,81 @@ bool Proxemics::getPotentialProxemicsLocations(
   ROS_INFO("request proxemics for user pose: x=%f, y=%f, z=%f yaw = %f", req.userPose.position.x, req.userPose.position.y, req.userPose.position.z, tf::getYaw(req.userPose.orientation));
   ROS_INFO("robotGenericTask: %d", req.robotGenericTaskId);
 
-  // Calculate robot pose in map coordinate frame
-  //stored the robot's origin in base_link frame
-  tf::Stamped<tf::Pose> robotOrigin = tf::Stamped<tf::Pose>(tf::Pose(tf::createQuaternionFromYaw(0),
-                                                                     tf::Point(0.0, 0.0, 0.0)), ros::Time(0),
-                                                            "base_link"); //base_link origin is the robot coordinate frame
-  //create a PoseStamped variable to store the StampedPost TF
-  geometry_msgs::PoseStamped map_frame; // create a map_frame to store robotOrigin in map frame
-  geometry_msgs::PoseStamped base_link_frame; // create a base_link_frame to store robotOrigin in base_link frame
-  tf::poseStampedTFToMsg(robotOrigin, base_link_frame); //stored the robot coordinate in base_link frame
-  try
-  {
-    listener.transformPose("map", base_link_frame, map_frame); //listen for base_link to map transform, then transform the robot coordinate to map coordinate frame
 
-    ROS_INFO("robot origin in base_link frame: (%.2f, %.2f. %.2f), in map frame: (%.2f, %.2f, %.2f)",
-        base_link_frame.pose.position.x, base_link_frame.pose.position.y, radian2degree(tf::getYaw(base_link_frame.pose.orientation)),
-        map_frame.pose.position.x, map_frame.pose.position.y, radian2degree(tf::getYaw(map_frame.pose.orientation)));
+  //if user is sitting
+  if ((req.userPosture==2) && isUserIn(req.userId, "Living Room"))//sitting on sofa
+  {
+    getPotentialProxemicsLocations_Sofa(req,res);
   }
-  catch (tf::TransformException& ex)
+  else if(req.userPosture ==1) //standing
   {
-    ROS_ERROR("Received an exception trying to transform robot origin from \"base_link\" to \"map\": %s", ex.what());
-  }
+    robotLocation = getRobotPose();
 
-  Pose robotLocation(map_frame.pose.position.x, map_frame.pose.position.y, tf::getYaw(map_frame.pose.orientation)); // stored the current robot pose
-
-
-  //2. Retreives user's preference
-  //proxemics_bearing = retrieveProxemicsPreferences(req.userId, req.robotGenericTaskId);
-  retrieveProxemicsPreferences_ranking(req.userId, req.robotGenericTaskId, ranked_bearing);
-/*  for (int j=0; j<21; j++)
-  {
-    if (ranked_bearing[j].orientation != 999)
-      ROS_INFO("Ranked Bearing %d orientation is %f distance is %f",j, radian2degree(ranked_bearing[j].orientation), ranked_bearing[j].distance);
-  }
-*/
-  //To do
-  //search based on distance
-  //search based on orientation
-  tf::Stamped<tf::Pose> p;
-
-  for(int i=0; i<21; i++)
-  {
-    if (ranked_bearing[i].orientation == 999)
-      i=21;     //21 possible approach target' poses, ignoring the back approach.
-    else
-    {   //calculate each bearing
-      proxemics_bearing = ranked_bearing[i];
-      //ROS_INFO("Ranked Bearing %d orientation is %f distance is %f",i, radian2degree(proxemics_bearing.orientation), proxemics_bearing.distance);
-
-      //3. Calculate all the target poses from the database, where distance and orientation can be obtain from step2
-      targetPose = calculateRobotPoseFromProxemicsPreference(req.userPose, proxemics_bearing);
-
-
-      //4. Eliminate target poses that could not be occupied by the robot based on static map (i.e. too close to obstacle or on obstacle)
-      //   Eliminate target poses that could not be reach by the robot based on static map
-      //5. Elimimate target poses that are not in the same location as the user (i.e. user is in living room, therefore all potential robot poses have to be in the living room for HRI)
-      bool validApproach = validApproachPosition(personLocation, robotLocation, targetPose);
-
-      if (validApproach == true)
-      {
-        p = tf::Stamped<tf::Pose>(tf::Pose(tf::createQuaternionFromYaw(targetPose.orientation),
-                                           tf::Point(targetPose.x, targetPose.y, 0.0)), ros::Time::now(), "map");
-        ROS_INFO("Ranked Bearing %d orientation is %f distance is %f",i, radian2degree(proxemics_bearing.orientation), proxemics_bearing.distance);
-        ROS_INFO("The approach position is valid+++++++++++++++++++++++++++++++++++++++++++++++++");
-
-        //6. Compile the respond message for the client.
-         geometry_msgs::PoseStamped pose; //create a PoseStamped variable to store the StampedPost TF
-         tf::poseStampedTFToMsg(p, pose); //convert the PoseStamped data into message format and store in pose
-         res.targetPoses.push_back(pose); //push the pose message into the respond vector to be send back to the client
-      }
+    //2. Retrieves user's preference - create a prioritise list of all possible bearing based on user's preference
+    retrieveProxemicsPreferences_ranking(req.userId, req.robotGenericTaskId, ranked_bearing);
+    if (SQL_error == true)
+      return true;
+    //To do //search based on distance  //search based on orientation
+    for(int i=0; i<21; i++)
+    {
+      if (ranked_bearing[i].orientation == 999)
+        i=21;     //21 possible approach target' poses, ignoring the back approach.
       else
-      {
-        //return robot current pose as temporary solution
-        /*p = tf::Stamped<tf::Pose>(tf::Pose(tf::createQuaternionFromYaw(tf::getYaw(map_frame.pose.orientation)),
-                                           tf::Point(map_frame.pose.position.x, map_frame.pose.position.y, 0.0)),
-                                  ros::Time::now(), "map");
-        */
-        ROS_INFO("Ranked Bearing %d orientation is %f distance is %f",i, radian2degree(proxemics_bearing.orientation), proxemics_bearing.distance);
-        ROS_INFO("The approach position is invalid----------------");
-      }
+      {   //calculate each bearing
+        proxemics_bearing = ranked_bearing[i];
+        //ROS_INFO("Ranked Bearing %d orientation is %f distance is %f",i, radian2degree(proxemics_bearing.orientation), proxemics_bearing.distance);
+
+        //3. Calculate all the target poses from the database, where distance and orientation can be obtain from step2
+        targetPose = calculateRobotPoseFromProxemicsPreference(req.userPose, proxemics_bearing);
+        if (SQL_error == true)
+              return true;
+        //4. Eliminate target poses that could not be occupied by the robot based on static map (i.e. too close to obstacle or on obstacle)
+        //   Eliminate target poses that could not be reach by the robot based on static map
+        //5. Elimimate target poses that are not in the same location as the user (i.e. user is in living room, therefore all potential robot poses have to be in the living room for HRI)
+
+
+/**/    bool validApproach = validApproachPosition(personLocation, robotLocation, targetPose);
+        if (validApproach == true)
+        {
+/**/      p = tf::Stamped<tf::Pose>(tf::Pose(tf::createQuaternionFromYaw(targetPose.orientation),
+                                             tf::Point(targetPose.x, targetPose.y, 0.0)), ros::Time::now(), "map");
+          ROS_INFO("Ranked Bearing %d orientation is %f distance is %f",i, radian2degree(proxemics_bearing.orientation), proxemics_bearing.distance);
+          ROS_INFO("The approach position is valid+++++++++++++++++++++++++++++++++++++++++++++++++");
+
+          //6. Compile the respond message for the client.
+           geometry_msgs::PoseStamped pose; //create a PoseStamped variable to store the StampedPost TF
+           tf::poseStampedTFToMsg(p, pose); //convert the PoseStamped data into message format and store in pose
+           res.targetPoses.push_back(pose); //push the pose message into the respond vector to be send back to the client
+
+           validDataCount++;
+/**/    }
+        else
+        {
+          ROS_INFO("Ranked Bearing %d orientation is %f distance is %f",i, radian2degree(proxemics_bearing.orientation), proxemics_bearing.distance);
+          ROS_INFO("The approach position is invalid----------------");
+        }
+/**/  }
     }
   }
 
-
   ROS_INFO("Sending request out");
-  /*The respond vector data from the server are in the following format and contain a list of potential target locations.
-   These potential target poses needed to be varify in the real environment to take into account of dynamic obstacles etc.
+  //check if there are data in it.
+  if ((validDataCount>0) && (SQL_error != true))
+  {
+    cout<<validDataCount<<" valid pose(s) found."<<endl;
+  }
+  else if (req.userPosture!=2)
+    {
+      cout<<"No valid target pose was found."<<endl;
+    }
 
-   res.targetPoses[i].seq
-   res.targetPoses[i].stamp
-   res.targetPoses[i].frame_id
-
-   res.targetPoses[i].pose.x
-   res.targetPoses[i].pose.y
-   res.targetPoses[i].pose.z
-
-   res.targetPoses[i].orientation.x
-   res.targetPoses[i].orientation.y
-   res.targetPoses[i].orientation.z
-   res.targetPoses[i].orientation.w
-   */
-
-  //res.sum = req.a + req.b;publishLocalPlan
-  //ROS_INFO("request: x=%ld, y=%ld", (long int)req.a, (long int)req.b);
-  //ROS_INFO("sending back response: [%ld]", (long int)res.sum);
   return true;
 }
 
-/******************************************************************************
- Retrieve user's proxemics preferences from the database
-
- *******************************************************************************/
-Proxemics::Bearing Proxemics::retrieveProxemicsPreferences(int userId, int robotGenericTaskId)
+bool Proxemics::isUserIn(int userId, string locationName)
 {
-  string test, temp1, temp2;
-  stringstream out;
-
-  Bearing bearing;
-
+  string sql;
+  int locationId;
 
   Driver *driver;
   Connection *con;
@@ -408,51 +211,340 @@ Proxemics::Bearing Proxemics::retrieveProxemicsPreferences(int userId, int robot
   con->setSchema(DATABASE); // select appropriate database schema
   stmt = con->createStatement(); // create a statement object
 
-  test = "SELECT * FROM UserProxemicPreferences where UserProxemicPreferences.userId = ";
-  test += to_string(userId);
-  test += " and UserProxemicPreferences.robotGenericTaskId = ";
-  test += to_string(robotGenericTaskId);
-  cout << test << endl;
-  result = stmt->executeQuery(test);
-
-  test = "SELECT * FROM Accompany.Proxemics where Accompany.Proxemics.proxemicId = ";
-
-  while (result->next())
-    test += result -> getString("proxemicId");
-
-  cout << test << endl;
-  result = stmt->executeQuery(test);
-
-  test = "SELECT * FROM RobotApproachDistance where RobotApproachDistance.robotApproachDistanceId = ";
-
-  while (result->next())
+  //determine if the current session user is in the Living Room
+  sql = "SELECT L.locationId from Locations L where L.name = '";
+  sql += locationName;
+  sql += "'";
+  cout << sql << endl;
+  result = stmt->executeQuery(sql);
+  if (result->next())
   {
-    temp1 = result -> getString("robotApproachDistanceId");
-    temp2 = result -> getString("robotApproachOrientationId");
+    locationId = result->getInt("locationId");
+
+    cout << "**********Current user location id is = " << locationId << endl;
+
+    sql = "call spCheckUserLocation( ";
+    sql += to_string(userId);
+    sql += ",";
+    sql += to_string(locationId);
+    sql += ",";
+    sql += "@res)";
+    cout << sql << endl;
+    if (stmt->execute(sql)) // return row count, if rowcnt >= 1 user is in Living Room
+    {
+      delete result;
+      delete stmt;
+      con->close();
+      delete con;  //this is to avoid issue where the "spCheckUserLocation" not returning when rowcnt = null?
+      cout << "User is in the "<<locationName <<endl; //check which sofa the user is sitting
+
+      return true;
+    }
+    else
+      {
+        delete result;
+        delete stmt;
+        con->close();
+        delete con;  //this is to avoid issue where the "spCheckUserLocation" not returning when rowcnt = null?
+        cout << "User is not in the "<<locationName<<endl; //check which sofa the user is sitting
+        SQL_error = true;
+        return false; //user is not in living room
+      }
   }
+  else
+  {
+    cout<<"No locationId for "<<locationName<<" was found in the Locations table."<<endl;
+    SQL_error = true;
+    return false;
+  }
+}
+/*
+ * Context-aware Proxemics for sofa, regardless of user
+ */
+void Proxemics::getPotentialProxemicsLocations_Sofa(accompany_context_aware_planner::GetPotentialProxemicsLocations::Request &req,
+                                                    accompany_context_aware_planner::GetPotentialProxemicsLocations::Response &res) //retrieves current user (who)
+{
+  string sql;
+  string currentUserPosture;
+  Pose targetPose;
+  geometry_msgs::PoseStamped pose; //create a PoseStamped variable to store the StampedPost TF
+  int proxemicsPoseId = 0; //default for multiple sofa activations.
+  int sensorId;
 
-  test += temp1;
-  cout << test << endl;
-  result = stmt->executeQuery(test);
+  string environmentId = "5"; //1 = UHRH, 5 = IPA Kitchen
 
-  while (result->next())
-    bearing.distance = (float)result -> getDouble("distance");
+  Driver *driver;
+  Connection *con;
+  Statement *stmt;
+  ResultSet *result;
+
+  driver = get_driver_instance();
+  con = driver->connect(DBHOST, USER, PASSWORD); // create a database connection using the Driver
+  con->setAutoCommit(0); // turn off the autocommit
+  con->setSchema(DATABASE); // select appropriate database schema
+  stmt = con->createStatement(); // create a statement object
+
+  sql = "SELECT COUNT(*) FROM Sensors S where S.name like 'Sofa%' and S.value = 1";
+  cout<<sql<<endl;
+  result = stmt->executeQuery(sql);     //Search for the number of occupied sofa.
+  if (result->next())
+  {
+    if (result->getInt("COUNT(*)") == 1)  //If only one sofa is occupied
+    {
+      sql = "SELECT S.sensorId FROM Sensors S where S.name like 'Sofa%' and S.value = 1";
+      cout<<sql<<endl;
+      result = stmt->executeQuery(sql); //Search for the occupied sofa's Id.
+      if(result->next())
+      {
+        sensorId = result->getInt("sensorId");
+        sql = "SELECT * FROM SensorBasedProxemicsPreferences where sensorId = ";
+        sql += to_string(sensorId);
+        cout<<sql<<endl;
+        result = stmt->executeQuery(sql);       //Search for the preferred proxemicsPoseId for the sofa using its Id.
+        if (result->next())
+        {
+          proxemicsPoseId = result->getInt("exceptionCaseProxemicsPoseId");
+          sql = "SELECT * FROM ExceptionCaseProxemicsPose where exceptionCaseProxemicsPoseId = ";
+          sql += to_string(proxemicsPoseId);
+          sql += " and environmentId = ";
+          sql += environmentId;
+          cout<<sql<<endl;
+          result = stmt->executeQuery(sql);     //Search for the pose of the proxemicsPoseId in the current environment.
+          if (result->next())
+          {
+            targetPose.x=result->getDouble("x");
+            targetPose.y=result->getDouble("y");
+            targetPose.orientation=degree2radian(result->getDouble("orientation"));
+            tf::Stamped<tf::Pose> p = tf::Stamped<tf::Pose>(tf::Pose(tf::createQuaternionFromYaw(targetPose.orientation),
+                                                 tf::Point(targetPose.x, targetPose.y, 0.0)), ros::Time::now(), "map");
+
+            tf::poseStampedTFToMsg(p, pose);    //Convert the PoseStamped data into message format and store in pose.
+            res.targetPoses.push_back(pose);    //Store the pose in the respond message for the client.
+          }
+          else
+          {
+            cout<<"Pose for exceptionCaseProxemicsPoseId = "<<proxemicsPoseId<<" was not found for environmentId "<< environmentId<<" in the ExceptionCaseProxemicsPose table."<<endl;
+            SQL_error = true;
+          }
+        }
+        else
+        {
+          cout<<"exceptionCaseProxemicsPoseId for sensorId "<<sensorId<<" was not found in the SensorBasedProxemicsPreferences table."<<endl;
+          SQL_error = true;
+        }
+      }
+      else
+      {
+        cout<<"No sofa sensors are activated now."<<endl;
+      }
+    }
+    else // more than one sofa is activated
+    {
+      cout<<"More than one sofa is activated."<<endl;
+      sql = "SELECT * FROM ExceptionCaseProxemicsPose where exceptionCaseProxemicsPoseId = ";
+      sql += to_string(proxemicsPoseId); //was declare as 0 for default position
+      sql += " and environmentId = ";
+      sql += environmentId;
+      cout<<sql<<endl;
+      result = stmt->executeQuery(sql); //Search for the pose of the proxemicsPoseId in the current environment.
+      if (result->next())
+      {
+        targetPose.x=result->getDouble("x");
+        targetPose.y=result->getDouble("y");
+        targetPose.orientation=degree2radian(result->getDouble("orientation"));
+        tf::Stamped<tf::Pose> p = tf::Stamped<tf::Pose>(tf::Pose(tf::createQuaternionFromYaw(targetPose.orientation),
+                                                     tf::Point(targetPose.x, targetPose.y, 0.0)), ros::Time::now(), "map");
+        //Compile the respond message for the client.
+        tf::poseStampedTFToMsg(p, pose); //convert the PoseStamped data into message format and store in pose
+        res.targetPoses.push_back(pose);
+      }
+      else
+      {
+        cout<<"Pose for exceptionCaseProxemicsPoseId = "<<proxemicsPoseId<<" was not found for environmentId "<< environmentId<<" in the ExceptionCaseProxemicsPose table."<<endl;
+        SQL_error = true;
+      }
+    }
+  }
+  else
+    cout<<"No sofa sensor is activated."<<endl;
 
 
-  test = "SELECT * FROM RobotApproachOrientation where RobotApproachOrientation.robotApproachOrientationId = ";
-  test += temp2;
-  cout << test << endl;
-  result = stmt->executeQuery(test);
+  delete result;
+  delete stmt;
+  con -> close();
+  delete con;
+}
 
-  while (result->next())
-    bearing.orientation = degree2radian(result -> getDouble("orientation"));
+/******************************************************************************
+ Retrieve user's proxemics preferences from the database
 
-  cout << "Distance = " << bearing.distance << " Orientation = " << radian2degree(bearing.orientation) << endl;
+ *******************************************************************************/
+Proxemics::Bearing Proxemics::retrieveProxemicsPreferences(int userId, int robotGenericTaskId)
+{
+  string sql, robotApproachDistanceId, robotApproachOrientationId;
+  stringstream out;
 
-  /* Simulated user's pose. The actual user's pose will be provided by the caller*/
-  // geometry_msgs::Pose userPose;
-  // userPose.orientation = tf::createQuaternionMsgFromYaw( degree2radian(87.6) ); //create Quaternion Msg from Yaw
-  // tf::pointTFToMsg(tf::Point(1, 1, 0), userPose.position);
+  Bearing bearing;
+
+  Driver *driver;
+  Connection *con;
+  Statement *stmt;
+  ResultSet *result;
+
+  driver = get_driver_instance();
+  con = driver->connect(DBHOST, USER, PASSWORD); // create a database connection using the Driver
+  con->setAutoCommit(0); // turn off the autocommit
+  con->setSchema(DATABASE); // select appropriate database schema
+  stmt = con->createStatement(); // create a statement object
+
+  sql  = "SELECT * FROM UserProxemicsPreferences where userId = ";
+  sql += to_string(userId);
+  sql += " and robotGenericTaskId = ";
+  sql += to_string(robotGenericTaskId);
+  cout << sql<< endl;
+  result = stmt->executeQuery(sql);     //retrieved user's proxemics preferences based on robot's generic task
+  if (result->next())
+  {
+    sql  = "SELECT * FROM Proxemics where proxemicsId = ";
+    sql += result->getString("proxemicsId");
+    cout<<sql<< endl;
+    result = stmt->executeQuery(sql);   //retrieved the proxemics baring from proxemicsId
+    if (result->next())
+    {
+      robotApproachDistanceId = result -> getString("robotApproachDistanceId");
+      robotApproachOrientationId = result -> getString("robotApproachOrientationId");
+
+      sql  = "SELECT * FROM RobotApproachDistance where robotApproachDistanceId = ";
+      sql += robotApproachDistanceId;
+      cout << sql<< endl;
+      result = stmt->executeQuery(sql); //retrieved the actual distance from the robotApproachDistanceId
+      if (result->next())
+      {
+        bearing.distance = (float)result -> getDouble("distance");
+
+        sql  = "SELECT * FROM RobotApproachOrientation where robotApproachOrientationId = ";
+        sql += robotApproachOrientationId;
+        cout << sql<< endl;
+        result = stmt->executeQuery(sql);       //retrieved the actual orientation from robotApproachOrientationId
+        if (result->next())
+        {
+          bearing.orientation = degree2radian(result -> getDouble("orientation"));
+
+          cout << "Distance = " << bearing.distance << " Orientation = " << radian2degree(bearing.orientation) << endl;
+        }
+        else
+        {
+          cout<<"Error with the following statement: "<<sql<<endl;
+          SQL_error = true;
+        }
+      }
+      else
+      {
+        cout<<"Error with the following statement: "<<sql<<endl;
+        SQL_error = true;
+      }
+    }
+    else
+    {
+      cout<<"Error with the following statement: "<<sql<<endl;
+      SQL_error = true;
+    }
+  }
+  else
+    {
+      cout<<"Error with the following statement: "<<sql<<endl;
+      SQL_error = true;
+    }
+
+  delete result;
+  delete stmt;
+  con -> close();
+  delete con;
+
+  return bearing;
+}
+/******************************************************************************
+ Retrieve user's proxemics preferences from the database
+
+ *******************************************************************************/
+Proxemics::BearingWithPriority Proxemics::retrieveProxemicsPreferencesWithPriority(int userId, int robotGenericTaskId)
+{
+  string sql, robotApproachDistanceId, robotApproachOrientationId;
+  stringstream out;
+
+  BearingWithPriority bearing;
+
+  Driver *driver;
+  Connection *con;
+  Statement *stmt;
+  ResultSet *result;
+
+  driver = get_driver_instance();
+  con = driver->connect(DBHOST, USER, PASSWORD); // create a database connection using the Driver
+  con->setAutoCommit(0); // turn off the autocommit
+  con->setSchema(DATABASE); // select appropriate database schema
+  stmt = con->createStatement(); // create a statement object
+
+  sql  = "SELECT * FROM UserProxemicsPreferences where userId = ";
+  sql += to_string(userId);
+  sql += " and robotGenericTaskId = ";
+  sql += to_string(robotGenericTaskId);
+  cout << sql<< endl;
+  result = stmt->executeQuery(sql);     //retrieved user's proxemics preferences based on robot's generic task
+  if (result->next())
+  {
+    sql  = "SELECT * FROM Proxemics where proxemicsId = ";
+    sql += result->getString("proxemicsId");
+    cout<<sql<< endl;
+    result = stmt->executeQuery(sql);   //retrieved the proxemics baring from proxemicsId
+    if (result->next())
+    {
+      robotApproachDistanceId = result -> getString("robotApproachDistanceId");
+      robotApproachOrientationId = result -> getString("robotApproachOrientationId");
+
+      sql  = "SELECT * FROM RobotApproachDistance where robotApproachDistanceId = ";
+      sql += robotApproachDistanceId;
+      cout << sql<< endl;
+      result = stmt->executeQuery(sql); //retrieved the actual distance from the robotApproachDistanceId
+      if (result->next())
+      {
+        bearing.distance.distance = (float)result -> getDouble("distance");
+        bearing.distance.priority = result -> getInt("priority");
+
+        sql  = "SELECT * FROM RobotApproachOrientation where robotApproachOrientationId = ";
+        sql += robotApproachOrientationId;
+        cout << sql<< endl;
+        result = stmt->executeQuery(sql);       //retrieved the actual orientation from robotApproachOrientationId
+        if (result->next())
+        {
+          bearing.orientation.orientation = degree2radian(result -> getDouble("orientation"));
+          bearing.orientation.priority = result -> getInt("priority");
+
+          cout<< "Distance = " << bearing.distance.distance << " Orientation = " << radian2degree(bearing.orientation.orientation) << endl;
+        }
+        else
+        {
+          cout<<"Error with the following statement: "<<sql<<endl;
+          SQL_error = true;
+        }
+      }
+      else
+      {
+        cout<<"Error with the following statement: "<<sql<<endl;
+        SQL_error = true;
+      }
+    }
+    else
+    {
+      cout<<"Error with the following statement: "<<sql<<endl;
+      SQL_error = true;
+    }
+  }
+  else
+    {
+      cout<<"Error with the following statement: "<<sql<<endl;
+      SQL_error = true;
+    }
 
   delete result;
   delete stmt;
@@ -463,22 +555,14 @@ Proxemics::Bearing Proxemics::retrieveProxemicsPreferences(int userId, int robot
 }
 
 /******************************************************************************
- Retrieve user's proxemics preferences from the database
+ Retrieve user's proxemics preferences with ranking
 
  *******************************************************************************/
 void Proxemics::retrieveProxemicsPreferences_ranking(int userId, int robotGenericTaskId, Bearing* rankedBearing)
 {
-  string test, temp1, temp2;
+  string  temp1, temp2, robotApproachDistanceId, robotApproachOrientationId;
 
-  int priority = 0;
-  int k=0;
-
-  Driver *driver;
-  Connection *con;
-  Statement *stmt;
-  ResultSet *result;
-
-  ProcTable procOrientationInfo[8];
+  BearingWithPriority bearingWithPriority;
 
   for (int h=0; h<21; h++) //init the arrays
     {
@@ -486,182 +570,182 @@ void Proxemics::retrieveProxemicsPreferences_ranking(int userId, int robotGeneri
       rankedBearing[h].distance  = 999;
     }
 
+  //search the database to retrieve the preferred bearing with their respective priority
+  bearingWithPriority = retrieveProxemicsPreferencesWithPriority(userId, robotGenericTaskId);
+  if (SQL_error == true)
+    return;
+  rankedBearing[0].distance = bearingWithPriority.distance.distance;
+  rankedBearing[0].orientation = bearingWithPriority.orientation.orientation;
+
+  rankDistanceBasedPriority(bearingWithPriority.distance.priority, rankedBearing);
+
+}
+/*****************************************************************************
+ *
+ * Ranked the robot target poses based on user's preferred distance as main priority
+ * starting from their preferred bearing (distance, orientation) and around them based
+ * on the orientation priority.
+ *
+ *
+ ****************************************************************************/
+void Proxemics::rankDistanceBasedPriority( int distancePriority, Bearing* rankedBearing)
+{
+
+  ProcTable procOrientationInfo[8];
+  int i;
+
+  string sql;
+  Driver *driver;
+  Connection *con;
+  Statement *stmt;
+  ResultSet *result;
+
   driver = get_driver_instance();
   con = driver->connect(DBHOST, USER, PASSWORD); // create a database connection using the Driver
   con->setAutoCommit(0); // turn off the autocommit
   con->setSchema(DATABASE); // select appropriate database schema
   stmt = con->createStatement(); // create a statement object
 
-  test = "SELECT * FROM UserProxemicPreferences where UserProxemicPreferences.userId = ";
-  test += to_string(userId);
-  test += " and UserProxemicPreferences.robotGenericTaskId = ";
-  test += to_string(robotGenericTaskId);
-  cout << test << endl;
-  result = stmt->executeQuery(test);
+  //retrieves the RobotApproachOrientation ranking list
+  sql = "SELECT * FROM RobotApproachOrientation";
+  result = stmt->executeQuery(sql);
 
-  test = "SELECT * FROM Accompany.Proxemics where Accompany.Proxemics.proxemicId = ";
-  while (result->next())
-    test += result -> getString("proxemicId");
-
-  cout << test << endl;
-  result = stmt->executeQuery(test);
-
-  while (result->next())
+  for (i=0; i<=7; i++)
   {
-    temp1 = result -> getString("robotApproachDistanceId");
-    temp2 = result -> getString("robotApproachOrientationId");
+    if (result->next())
+    {
+      procOrientationInfo[i].robotApproachOrientationId = result->getInt("robotApproachOrientationId");
+      procOrientationInfo[i].orientation = degree2radian(result->getInt("orientation"));
+      procOrientationInfo[i].priority = result->getInt("priority");
+    }
+    else if (i == 0)
+      {
+        cout<<"Error executing "<<sql<<" statement."<<endl;
+        SQL_error = true;
+        return;
+      }
+      else
+      {
+        cout<<"Error retrieving (the "<<i<<"th) result from "<<sql<<" statement."<<endl;
+        SQL_error = true;
+        return;
+      }
+   }
 
-  }
 
-  test = "SELECT * FROM RobotApproachDistance where RobotApproachDistance.robotApproachDistanceId = ";
-  test += temp1;
-  cout << test << endl;
-  result = stmt->executeQuery(test);
-  while (result->next())
-  {
-    rankedBearing[0].distance = (float) result -> getDouble("distance");
-    priority = result ->getInt("priority");
-  }
-
-  test = "SELECT * FROM RobotApproachOrientation where RobotApproachOrientation.robotApproachOrientationId = ";
-  test += temp2;
-  cout << test << endl;
-  result = stmt->executeQuery(test);
-  while (result->next())
-    rankedBearing[0].orientation = (float) degree2radian((result -> getDouble("orientation")));
-
-  cout << "Distance = " << rankedBearing[0].distance << " Orientation = " << radian2degree(rankedBearing[0].orientation) << endl;
-
-  test = "SELECT * FROM RobotApproachOrientation";
-  result = stmt->executeQuery(test);
-
-  while(result->next())
-  {
-    procOrientationInfo[k].robotApproachOrientationId = result->getInt("robotApproachOrientationId");
-    procOrientationInfo[k].orientation = degree2radian(result->getInt("orientation"));
-    procOrientationInfo[k].priority = result->getInt("priority");
-    k++;
-  }
-
-  k = 1;
-
+  int k = 1;
   float distance = 0;
 
-  for (int h = priority; h<=3; h++)
+  if (distancePriority == 1)
+    distance = 0.825; //read from database
+  else if (distancePriority == 2)
+    distance = 1.5;
+  else if (distancePriority == 3)
+    distance = 2;
+
+  //perform the first ranking cycle around the user's preferred distance, based on their preferred bearing( distance, orientation).
+  if (rankedBearing[0].orientation == degree2radian(0)) //then check id 1, then check RobotApproachOrientation id 2, 3 or 3, 2 depending on user's handedness or current robot location //front
   {
-    if (h == 1)
-      distance = 0.825;
-    else
-      if (h == 2)
+    //search for next bearing that fall on right side
+    for (int j=1; j<=4; j++)  //priority, ignore the back i.e. 5
+      for (int i=0; i<8; i++) //number of data to search
+        if ((procOrientationInfo[i].orientation <= degree2radian(0)) && (procOrientationInfo[i].orientation > degree2radian(-140))) //right side, angle between -1 to -140
+          if (procOrientationInfo[i].priority == j)
+            if (procOrientationInfo[i].orientation != rankedBearing[0].orientation) //&& (procOrientationInfo[i].distance != rankedBearing[0].distance))
+            {
+              rankedBearing[k].orientation = procOrientationInfo[i].orientation;
+              rankedBearing[k].distance = distance;
+              k++;
+            }
+    //search for next bearing that fall on a different side
+    for (int j=1; j<=4; j++)  //priority, ignore the back i.e. 5
+      for (int i=0; i<8; i++) //number of data to search
+        if ((procOrientationInfo[i].orientation > degree2radian(0)) && (procOrientationInfo[i].orientation < degree2radian(140))) //left side, angle between 1 to 140
+            if (procOrientationInfo[i].priority == j)
+              if (procOrientationInfo[i].orientation != rankedBearing[0].orientation)
+              {
+                rankedBearing[k].orientation = procOrientationInfo[i].orientation;
+                rankedBearing[k].distance = distance;
+                k++;
+              }
+  }   //if user's preferred bearing is to the left side
+  else if (rankedBearing[0].orientation > degree2radian(0)) // then check id 2,4,6
+  {
+    //search for next bearing that fall on the different side as the preferred bearing
+    for (int j=1; j<=4; j++)  //priority, ignore the back i.e. 5
+      for (int i=0; i<8; i++) //number of data to search
+        if ((procOrientationInfo[i].orientation >= degree2radian(0)) && (procOrientationInfo[i].orientation < degree2radian(140))) //left side, angle between 1 to 140
+          if (procOrientationInfo[i].priority == j)
+              if (procOrientationInfo[i].orientation != rankedBearing[0].orientation)
+              {
+                rankedBearing[k].orientation = procOrientationInfo[i].orientation;
+                rankedBearing[k].distance = distance;
+                k++;
+              }
+    //search for next bearing that fall on the same side as the preferred bearing
+    for (int j=1; j<=4; j++)  //priority, ignore the back i.e. 5
+      for (int i=0; i<8; i++) //number of data to search
+        if ((procOrientationInfo[i].orientation < degree2radian(0)) && (procOrientationInfo[i].orientation > degree2radian(-140))) //right side, angle between -1 to -140
+          if (procOrientationInfo[i].priority == j)
+            if (procOrientationInfo[i].orientation != rankedBearing[0].orientation) //&& (procOrientationInfo[i].distance != rankedBearing[0].distance))
+            {
+              rankedBearing[k].orientation = procOrientationInfo[i].orientation;
+              rankedBearing[k].distance = distance;
+              k++;
+            }
+  }   //if user's preferred bearing is to the right side
+  else if (rankedBearing[0].orientation < degree2radian(0)) // then check id 3,5,7 //right side
+  {
+    //search for next bearing that fall on the same side as the preferred bearing
+    for (int j=1; j<=4; j++)  //priority, ignore the back i.e. 5
+      for (int i=0; i<8; i++) //number of data to search
+        if ((procOrientationInfo[i].orientation <= degree2radian(0)) && (procOrientationInfo[i].orientation > degree2radian(-140))) //right side, angle between -1 to -140
+          if (procOrientationInfo[i].priority == j)
+            if (procOrientationInfo[i].orientation != rankedBearing[0].orientation) //&& (procOrientationInfo[i].distance != rankedBearing[0].distance))
+            {
+              rankedBearing[k].orientation = procOrientationInfo[i].orientation;
+              rankedBearing[k].distance = distance;
+              k++;
+            }
+      //search for next bearing that fall on the different side as the preferred bearing
+    for (int j=1; j<=4; j++)  //priority, ignore the back i.e. 5
+      for (int i=0; i<8; i++) //number of data to search
+        if ((procOrientationInfo[i].orientation > degree2radian(0)) && (procOrientationInfo[i].orientation < degree2radian(140))) //left side, angle between 1 to 140
+          if (procOrientationInfo[i].priority == j)
+              if (procOrientationInfo[i].orientation != rankedBearing[0].orientation)
+              {
+                rankedBearing[k].orientation = procOrientationInfo[i].orientation;
+                rankedBearing[k].distance = distance;
+                k++;
+              }
+  }
+
+  //Replicated the same orientation ranking for two other distances based on their priority
+  for(int i=1; i<=3; i++)
+  {
+    if (distancePriority != i) //if the orientation ranking haven't being done for this distance then do it
+    {
+      if (i == 1)
+        distance = 0.825; //read from database
+      else if (i == 2)
         distance = 1.5;
-      else
-        if (h == 3)
-          distance = 2;
+      else if (i == 3)
+        distance = 2;
 
-    if (k<7) //perform the first cycle of ranking then reuse for different distances
-    {
-      if (rankedBearing[0].orientation == degree2radian(0)) //then check id 1, then check RobotApproachOrientation id 2, 3 or 3, 2 depending on user's handedness or current robot location //front
-      {
-        //search for next bearing that fall on right side
-        for (int j=1; j<=4; j++)  //priority, ignore the back i.e. 5
-          for (int i=0; i<8; i++) //number of data to search
-            if ((procOrientationInfo[i].orientation <= degree2radian(0)) && (procOrientationInfo[i].orientation > degree2radian(-140))) //right side, angle between -1 to -140
-              if (procOrientationInfo[i].priority == j)
-                if (procOrientationInfo[i].orientation != rankedBearing[0].orientation) //&& (procOrientationInfo[i].distance != rankedBearing[0].distance))
-                {
-                  rankedBearing[k].orientation = procOrientationInfo[i].orientation;
-                  rankedBearing[k].distance = distance;
-                  k++;
-                }
-
-        //search for next bearing that fall on a different side
-        for (int j=1; j<=4; j++)  //priority, ignore the back i.e. 5
-          for (int i=0; i<8; i++) //number of data to search
-            if ((procOrientationInfo[i].orientation > degree2radian(0)) && (procOrientationInfo[i].orientation < degree2radian(140))) //left side, angle between 1 to 140
-              if (procOrientationInfo[i].priority == j)
-                  if (procOrientationInfo[i].orientation != rankedBearing[0].orientation)
-                  {
-                    rankedBearing[k].orientation = procOrientationInfo[i].orientation;
-                    rankedBearing[k].distance = distance;
-                    k++;
-                  }
-      }
-
-      //if (rankedBearing[0].orientation == 180)
-
-      else if (rankedBearing[0].orientation > degree2radian(0)) // then check id 2,4,6 //left
-      {
-        //search for next bearing that fall on the different side as the preferred bearing
-        for (int j=1; j<=4; j++)  //priority, ignore the back i.e. 5
-          for (int i=0; i<8; i++) //number of data to search
-            if ((procOrientationInfo[i].orientation >= degree2radian(0)) && (procOrientationInfo[i].orientation < degree2radian(140))) //left side, angle between 1 to 140
-              if (procOrientationInfo[i].priority == j)
-                  if (procOrientationInfo[i].orientation != rankedBearing[0].orientation)
-                  {
-                    rankedBearing[k].orientation = procOrientationInfo[i].orientation;
-                    rankedBearing[k].distance = distance;
-                    k++;
-                  }
-
-        //search for next bearing that fall on the same side as the preferred bearing
-        for (int j=1; j<=4; j++)  //priority, ignore the back i.e. 5
-          for (int i=0; i<8; i++) //number of data to search
-            if ((procOrientationInfo[i].orientation < degree2radian(0)) && (procOrientationInfo[i].orientation > degree2radian(-140))) //right side, angle between -1 to -140
-              if (procOrientationInfo[i].priority == j)
-                if (procOrientationInfo[i].orientation != rankedBearing[0].orientation) //&& (procOrientationInfo[i].distance != rankedBearing[0].distance))
-                {
-                  rankedBearing[k].orientation = procOrientationInfo[i].orientation;
-                  rankedBearing[k].distance = distance;
-                  k++;
-                }
-      }
-
-      else if (rankedBearing[0].orientation < degree2radian(0)) // then check id 3,5,7 //right side
-      {
-        //search for next bearing that fall on the same side as the preferred bearing
-        for (int j=1; j<=4; j++)  //priority, ignore the back i.e. 5
-          for (int i=0; i<8; i++) //number of data to search
-            if ((procOrientationInfo[i].orientation <= degree2radian(0)) && (procOrientationInfo[i].orientation > degree2radian(-140))) //right side, angle between -1 to -140
-              if (procOrientationInfo[i].priority == j)
-                if (procOrientationInfo[i].orientation != rankedBearing[0].orientation) //&& (procOrientationInfo[i].distance != rankedBearing[0].distance))
-                {
-                  rankedBearing[k].orientation = procOrientationInfo[i].orientation;
-                  rankedBearing[k].distance = distance;
-                  k++;
-                }
-
-
-        //search for next bearing that fall on the different side as the preferred bearing
-        for (int j=1; j<=4; j++)  //priority, ignore the back i.e. 5
-          for (int i=0; i<8; i++) //number of data to search
-            if ((procOrientationInfo[i].orientation > degree2radian(0)) && (procOrientationInfo[i].orientation < degree2radian(140))) //left side, angle between 1 to 140
-              if (procOrientationInfo[i].priority == j)
-                  if (procOrientationInfo[i].orientation != rankedBearing[0].orientation)
-                  {
-                    rankedBearing[k].orientation = procOrientationInfo[i].orientation;
-                    rankedBearing[k].distance = distance;
-                    k++;
-                  }
-      }
-    }
-  else
-    for (int i=0; i<7; i++) //copy the rank list
-    {
-      rankedBearing[k].orientation = rankedBearing[k-7].orientation;
-      rankedBearing[k].distance = distance;
-      k++;
+      for (int j=0; j<7; j++) //use the new rank list and replicate for other distances
+         {
+           rankedBearing[k].orientation = rankedBearing[k-7].orientation;
+           rankedBearing[k].distance = distance;
+           k++;
+         }
     }
   }
 
-  for (int j=0; j<21; j++)
+  for (int j=0; j<21; j++) //display all the rankedBearing
   {
     if (rankedBearing[j].orientation != 999)
       cout<<"Ranked Bearing "<<j<<" orientation is "<<radian2degree(rankedBearing[j].orientation)<<", distance is "<<rankedBearing[j].distance<< endl;
   }
-  /* Simulated user's pose. The actual user's pose will be provided by the caller*/
-  // geometry_msgs::Pose userPose;
-  // userPose.orientation = tf::createQuaternionMsgFromYaw( degree2radian(87.6) ); //create Quaternion Msg from Yaw
-  // tf::pointTFToMsg(tf::Point(1, 1, 0), userPose.position);
 
   delete result;
   delete stmt;
@@ -670,55 +754,6 @@ void Proxemics::retrieveProxemicsPreferences_ranking(int userId, int robotGeneri
 
 }
 
-/*first calculate the possible pose then eliminate and rearranged based on closest distance.
-
-id = 3
-
-if id.orientation = 0, then check id 1, then check RobotApproachOrientation id 2, 3 or 3, 2 depending on user's handedness or current robot location //front
-
-if id.orientation > 0, then check id 2,4,6 //left
-
-
-if id.orientation < 0, then check id 3,5,7 //right side
-  stored the current bearing
-  search for next bearing
-
-
-  for (j=1; j<=4, j++)  //priority
-    for (i=0; i<8; i++) //number of data to search
-      if orientation < 0 orientation > -140 //right side, angle between -1 to -140
-        if priority == j && id !=id.orientation
-          stored current bearing.
-          break;
-
-  for (j=1; j<=4, j++)
-    for (i=0; i<8; i++)
-     if orientation > 0 orientation < 140 //left side, angle between 1 to 140
-        if priority == j
-          stored current bearing.
-          break;
-
-
-if id.orientation = (+/-) 180 //back
-
-
-
-1,2,3 for orientation, for another orientation
-  id is 3 = front right default = -45, -90,     0,   +45, +90         D = 1.5m
-                                = -45, -90,     0,   +45, +90         D = 2m
-
-  id is 5 = side right default  = -90, -45,  -135,  0
-//id is
-
-if orientation = 0, then check id 1, then check RobotApproachOrientation id 2, 3 or 3, 2 depending on user's handedness or current robot location //front
-
-
-if orientation >=0, then check id 2,4,6 //left
-
-if orientation <=0, then check id 3,5,7 //right side
-
-if orientation = (+/-) 180 //back
-*/
 /******************************************************************************
  Calculate the the robot's target pose relative to the user's pose, based on
  the user's proxemics preference
@@ -816,8 +851,17 @@ bool Proxemics::validApproachPosition(Pose personLocation, Pose robotLocation, P
   cv::circle(expanded_map_with_person, potentialApproachPosePixel, 3, cv::Scalar(200, 200, 200, 200), -1); //approach position
   //cv::line(expanded_map_with_person, convertFromMeterToPixelCoordinates<cv::Point>(Pose(1.f,0.2f,0.f)), convertFromMeterToPixelCoordinates<cv::Point>(Pose(-1.f,0.2f,0.f)), cv::Scalar(0,0,0,0), 2);
   //cv::line(map_, convertFromMeterToPixelCoordinates<cv::Point>(Pose(1.f,0.2f,0.f)), convertFromMeterToPixelCoordinates<cv::Point>(Pose(-1.f,0.2f,0.f)), cv::Scalar(0,0,0,0), 2);
-  cv::imshow("contour areas", expanded_map_with_person);
+
+/*//To Display the results
+ *
+  //cv::imshow("contour areas", expanded_map_with_person);
+
+  cv::Mat expanded_map_with_person_flip;
+  cv::flip(expanded_map_with_person, expanded_map_with_person_flip,0);
+  cv::imshow("contour areas flip",expanded_map_with_person_flip);
+
   cv::waitKey(100);
+*/
 
   // Eliminate poses that could not be reach by the robot based on static map
   // i.e. check whether potentialApproachPose and robotLocation are in the same area (=same contour)
@@ -900,4 +944,33 @@ void Proxemics::updateMapCallback(const nav_msgs::OccupancyGridConstPtr& map_msg
 
 
   ROS_INFO("Map received.");
+}
+
+Proxemics::Pose Proxemics::getRobotPose()
+{
+  // Calculate robot pose in map coordinate frame
+  //stored the robot's origin in base_link frame
+  tf::Stamped<tf::Pose> robotOrigin = tf::Stamped<tf::Pose>(tf::Pose(tf::createQuaternionFromYaw(0),
+                                                                       tf::Point(0.0, 0.0, 0.0)), ros::Time(0),
+                                                              "base_link"); //base_link origin is the robot coordinate frame
+  //create a PoseStamped variable to store the StampedPost TF
+  geometry_msgs::PoseStamped map_frame; // create a map_frame to store robotOrigin in map frame
+  geometry_msgs::PoseStamped base_link_frame; // create a base_link_frame to store robotOrigin in base_link frame
+  tf::poseStampedTFToMsg(robotOrigin, base_link_frame); //stored the robot coordinate in base_link frame
+  try
+  {
+    listener.transformPose("map", base_link_frame, map_frame); //listen for base_link to map transform, then transform the robot coordinate to map coordinate frame
+
+    ROS_INFO("robot origin in base_link frame: (%.2f, %.2f. %.2f), in map frame: (%.2f, %.2f, %.2f)",
+        base_link_frame.pose.position.x, base_link_frame.pose.position.y, radian2degree(tf::getYaw(base_link_frame.pose.orientation)),
+        map_frame.pose.position.x, map_frame.pose.position.y, radian2degree(tf::getYaw(map_frame.pose.orientation)));
+  }
+  catch (tf::TransformException& ex)
+  {
+    ROS_ERROR("Received an exception trying to transform robot origin from \"base_link\" to \"map\": %s", ex.what());
+  }
+
+  Pose robotLocation(map_frame.pose.position.x, map_frame.pose.position.y, tf::getYaw(map_frame.pose.orientation)); // stored the current robot pose
+
+  return robotLocation;
 }

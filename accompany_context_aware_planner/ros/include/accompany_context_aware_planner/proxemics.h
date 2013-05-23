@@ -37,6 +37,10 @@ class Proxemics
 {
 public:
 
+  Proxemics(){};
+
+  ~Proxemics(){};
+
   void init(ros::NodeHandle nh, string dbhost, string user, string password, string database)
   {
     node_handle_ = nh;
@@ -68,11 +72,48 @@ public:
     float priority;
   };
 
-
   struct Bearing
   {
     float distance;
     float orientation;
+
+    Bearing()
+    {
+      distance = 0.0;
+      orientation = 0.0;
+    }
+
+
+  };
+
+  struct DistanceWithPriority
+  {
+   float distance;
+   int  priority;
+
+   DistanceWithPriority()
+   {
+     distance = 0.0;
+     priority = 0;
+    }
+  };
+
+  struct OrientationWithPriority
+  {
+    float orientation;
+    int priority;
+
+    OrientationWithPriority()
+    {
+      orientation = 0.0;
+      priority = 0;
+    }
+  };
+
+  struct BearingWithPriority
+  {
+    DistanceWithPriority distance;
+    OrientationWithPriority orientation;
   };
 
   struct Pose
@@ -105,7 +146,10 @@ public:
   float degree2radian(float degree);
   float radian2degree(float radian);
 
-  void getPotentialProxemicsLocations_Sofa_Y1(void); //from session control entry in the Database
+  bool isUserIn(int userId, string locationName);
+
+  void getPotentialProxemicsLocations_Sofa(accompany_context_aware_planner::GetPotentialProxemicsLocations::Request &req,
+                                              accompany_context_aware_planner::GetPotentialProxemicsLocations::Response &res); //from session control entry in the Database
 
   float getUserRadius(float thetaInRadian, float halfShoulderWidth, float halfChestDepth);
 
@@ -113,12 +157,18 @@ public:
                                       accompany_context_aware_planner::GetPotentialProxemicsLocations::Response &res);
 
   Bearing retrieveProxemicsPreferences(int userId, int robotGenericTaskId);
+  BearingWithPriority retrieveProxemicsPreferencesWithPriority(int userId, int robotGenericTaskId);
 
   void retrieveProxemicsPreferences_ranking(int userId, int robotGenericTaskId,  Bearing *);
+  void rankDistanceBasedPriority( int distancePriority, Bearing* );
 
   Pose calculateRobotPoseFromProxemicsPreference(geometry_msgs::Pose &userPose, Bearing prefBearing);
+
+  Pose getRobotPose(void);
+
   bool validApproachPosition(Pose personLocation, Pose robotLocation, Pose potentialApproachPose);
   void updateMapCallback(const nav_msgs::OccupancyGridConstPtr& map_msg);
+
 
 protected:
 
@@ -139,6 +189,8 @@ protected:
   double personRadius; // in [m]
 
   double map_resolution_; // in [m/cell]
+
+  bool SQL_error;
 
   cv::Mat map_;
   cv::Mat expanded_map_;

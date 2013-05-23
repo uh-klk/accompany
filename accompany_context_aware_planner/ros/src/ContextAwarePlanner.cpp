@@ -8,33 +8,38 @@
 #define DATABASE "Accompany"
 
 
-
 int main(int argc, char * argv[])
 {
   ros::init(argc, argv, "context_aware_planner_server");
   ros::NodeHandle n;
-
   Proxemics p;
   p.init(n, DBHOST, USER, PASSWORD, DATABASE);
+  ros::spin();
 
+
+/*
   if (argc == 2)
   {
     std::string str = argv[1];
     if (!str.compare("Y1"))
     {
-      ros::Rate r(1); // 10 hz
+      ros::Rate r(10); // 10 hz
       while (ros::ok())
       {
-        p.getPotentialProxemicsLocations_Sofa_Y1();
+     //   p.getPotentialProxemicsLocations_Sofa_Y1();
         r.sleep();
       }
     }
     else if (!str.compare("Y2"))
-          ros::spin();
+          {
+
+            ros::spin();
+
+          }
   }
   else
     ROS_INFO("usage:    'accompany_context_aware_planner Y1' for year 1 context aware planner implementation");
     ROS_INFO("          'accompany_context_aware_planner Y2' for year 2 context aware planner implementation");
-
+*/
   return 0;
 }
