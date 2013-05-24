@@ -31,10 +31,4 @@
 =======================================================================
 Usage:
 
-To run Year 1 implementation that update robot's target pose in the database based on sofa sensors info. run
-	
-	>accompany_context_aware_planner Y1
-	
-For Year 2 implementation run
-	
-	>accompany_context_aware_planner Y2
+	>accompany_context_aware_planner
