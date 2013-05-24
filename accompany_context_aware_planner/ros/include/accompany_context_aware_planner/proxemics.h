@@ -151,10 +151,14 @@ public:
   void getPotentialProxemicsLocations_Sofa(accompany_context_aware_planner::GetPotentialProxemicsLocations::Request &req,
                                               accompany_context_aware_planner::GetPotentialProxemicsLocations::Response &res); //from session control entry in the Database
 
+  void getPotentialProxemicsLocations_Kitchen(accompany_context_aware_planner::GetPotentialProxemicsLocations::Request &req,
+      accompany_context_aware_planner::GetPotentialProxemicsLocations::Response &res);
+
   float getUserRadius(float thetaInRadian, float halfShoulderWidth, float halfChestDepth);
 
   bool getPotentialProxemicsLocations(accompany_context_aware_planner::GetPotentialProxemicsLocations::Request &req,
                                       accompany_context_aware_planner::GetPotentialProxemicsLocations::Response &res);
+
 
   Bearing retrieveProxemicsPreferences(int userId, int robotGenericTaskId);
   BearingWithPriority retrieveProxemicsPreferencesWithPriority(int userId, int robotGenericTaskId);

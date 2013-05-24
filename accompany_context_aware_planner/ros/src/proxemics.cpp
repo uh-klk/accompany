@@ -126,12 +126,30 @@ bool Proxemics::getPotentialProxemicsLocations(
 
 
   //if user is sitting
-  if ((req.userPosture==2) && isUserIn(req.userId, "Living Room"))//sitting on sofa
+  if ((req.userPosture == 2) && isUserIn(req.userId, "Living Room"))    //sitting on sofa
   {
     getPotentialProxemicsLocations_Sofa(req,res);
+    cout<<"Done processing user on sofa in living room"<<endl;
+    if (SQL_error == true)
+    {
+      cout<<"SQL_error!!!"<<endl;
+      return true;
+    }
+
   }
-  else if(req.userPosture ==1) //standing
+  else if ((req.userPosture == 1) && isUserIn(req.userId, "Kitchen"))   //user is in the kitchen
   {
+    getPotentialProxemicsLocations_Kitchen(req,res);
+    cout<<"Done processing user in kitchen"<<endl;
+    if (SQL_error == true)
+    {
+      cout<<"SQL_error!!!"<<endl;
+      return true;
+    }
+  }
+  else if(req.userPosture == 1) //standing
+  {
+
     robotLocation = getRobotPose();
 
     //2. Retrieves user's preference - create a prioritise list of all possible bearing based on user's preference
@@ -181,16 +199,21 @@ bool Proxemics::getPotentialProxemicsLocations(
     }
   }
 
-  ROS_INFO("Sending request out");
+  ;
   //check if there are data in it.
   if ((validDataCount>0) && (SQL_error != true))
   {
     cout<<validDataCount<<" valid pose(s) found."<<endl;
+    cout<<"Sending pose(s) out."<<endl;
+    return true;
   }
-  else if (req.userPosture!=2)
-    {
-      cout<<"No valid target pose was found."<<endl;
-    }
+  else if ((req.userPosture!=2) && isUserIn(req.userId, "Kitchen"))
+  {
+    cout<<"No valid target pose was found."<<endl;
+    return true;
+  }
+
+  cout<<"Found an exceptionCaseProxemicPose."<<endl;
 
   return true;
 }
@@ -230,7 +253,7 @@ bool Proxemics::isUserIn(int userId, string locationName)
     sql += ",";
     sql += "@res)";
     cout << sql << endl;
-    if (stmt->execute(sql)) // return row count, if rowcnt >= 1 user is in Living Room
+    if (stmt->execute(sql)) // return row , if rowcnt >= 1 user is in Living Room
     {
       delete result;
       delete stmt;
@@ -247,7 +270,7 @@ bool Proxemics::isUserIn(int userId, string locationName)
         con->close();
         delete con;  //this is to avoid issue where the "spCheckUserLocation" not returning when rowcnt = null?
         cout << "User is not in the "<<locationName<<endl; //check which sofa the user is sitting
-        SQL_error = true;
+
         return false; //user is not in living room
       }
   }
@@ -258,9 +281,9 @@ bool Proxemics::isUserIn(int userId, string locationName)
     return false;
   }
 }
-/*
+/******************************************************************************
  * Context-aware Proxemics for sofa, regardless of user
- */
+ ******************************************************************************/
 void Proxemics::getPotentialProxemicsLocations_Sofa(accompany_context_aware_planner::GetPotentialProxemicsLocations::Request &req,
                                                     accompany_context_aware_planner::GetPotentialProxemicsLocations::Response &res) //retrieves current user (who)
 {
@@ -271,7 +294,7 @@ void Proxemics::getPotentialProxemicsLocations_Sofa(accompany_context_aware_plan
   int proxemicsPoseId = 0; //default for multiple sofa activations.
   int sensorId;
 
-  string environmentId = "5"; //1 = UHRH, 5 = IPA Kitchen
+  int experimentalLocationId; //1 = UHRH, 5 = IPA Kitchen
 
   Driver *driver;
   Connection *con;
@@ -284,89 +307,101 @@ void Proxemics::getPotentialProxemicsLocations_Sofa(accompany_context_aware_plan
   con->setSchema(DATABASE); // select appropriate database schema
   stmt = con->createStatement(); // create a statement object
 
-  sql = "SELECT COUNT(*) FROM Sensors S where S.name like 'Sofa%' and S.value = 1";
-  cout<<sql<<endl;
-  result = stmt->executeQuery(sql);     //Search for the number of occupied sofa.
+  sql = "SELECT * FROM SessionControl ";
+  result = stmt->executeQuery(sql);
   if (result->next())
   {
-    if (result->getInt("COUNT(*)") == 1)  //If only one sofa is occupied
+    experimentalLocationId = result->getInt("ExperimentalLocationId");
+
+    sql = "SELECT COUNT(*) FROM Sensors S where S.name like 'Sofa%' and S.value = 1";
+    cout<<sql<<endl;
+    result = stmt->executeQuery(sql);     //Search for the number of occupied sofa.
+    if (result->next())
     {
-      sql = "SELECT S.sensorId FROM Sensors S where S.name like 'Sofa%' and S.value = 1";
-      cout<<sql<<endl;
-      result = stmt->executeQuery(sql); //Search for the occupied sofa's Id.
-      if(result->next())
+      if (result->getInt("COUNT(*)") == 1)  //If only one sofa is occupied
       {
-        sensorId = result->getInt("sensorId");
-        sql = "SELECT * FROM SensorBasedProxemicsPreferences where sensorId = ";
-        sql += to_string(sensorId);
+        sql = "SELECT S.sensorId FROM Sensors S where S.name like 'Sofa%' and S.value = 1";
         cout<<sql<<endl;
-        result = stmt->executeQuery(sql);       //Search for the preferred proxemicsPoseId for the sofa using its Id.
-        if (result->next())
+        result = stmt->executeQuery(sql); //Search for the occupied sofa's Id.
+        if(result->next())
         {
-          proxemicsPoseId = result->getInt("exceptionCaseProxemicsPoseId");
-          sql = "SELECT * FROM ExceptionCaseProxemicsPose where exceptionCaseProxemicsPoseId = ";
-          sql += to_string(proxemicsPoseId);
-          sql += " and environmentId = ";
-          sql += environmentId;
+          sensorId = result->getInt("sensorId");
+          sql = "SELECT * FROM SensorBasedProxemicsPreferences where sensorId = ";
+          sql += to_string(sensorId);
           cout<<sql<<endl;
-          result = stmt->executeQuery(sql);     //Search for the pose of the proxemicsPoseId in the current environment.
+          result = stmt->executeQuery(sql);       //Search for the preferred proxemicsPoseId for the sofa using its Id.
           if (result->next())
           {
-            targetPose.x=result->getDouble("x");
-            targetPose.y=result->getDouble("y");
-            targetPose.orientation=degree2radian(result->getDouble("orientation"));
-            tf::Stamped<tf::Pose> p = tf::Stamped<tf::Pose>(tf::Pose(tf::createQuaternionFromYaw(targetPose.orientation),
-                                                 tf::Point(targetPose.x, targetPose.y, 0.0)), ros::Time::now(), "map");
+            proxemicsPoseId = result->getInt("exceptionCaseProxemicsPoseId");
+            sql = "SELECT * FROM ExceptionCaseProxemicsPose where exceptionCaseProxemicsPoseId = ";
+            sql += to_string(proxemicsPoseId);
+            sql += " and environmentId = ";
+            sql += to_string(experimentalLocationId);
+            cout<<sql<<endl;
+            result = stmt->executeQuery(sql);     //Search for the pose of the proxemicsPoseId in the current environment.
+            if (result->next())
+            {
+              targetPose.x=result->getDouble("x");
+              targetPose.y=result->getDouble("y");
+              targetPose.orientation=degree2radian(result->getDouble("orientation"));
+              tf::Stamped<tf::Pose> p = tf::Stamped<tf::Pose>(tf::Pose(tf::createQuaternionFromYaw(targetPose.orientation),
+                                                   tf::Point(targetPose.x, targetPose.y, 0.0)), ros::Time::now(), "map");
 
-            tf::poseStampedTFToMsg(p, pose);    //Convert the PoseStamped data into message format and store in pose.
-            res.targetPoses.push_back(pose);    //Store the pose in the respond message for the client.
+              tf::poseStampedTFToMsg(p, pose);    //Convert the PoseStamped data into message format and store in pose.
+              res.targetPoses.push_back(pose);    //Store the pose in the respond message for the client.
+            }
+            else
+            {
+              cout<<"Pose for exceptionCaseProxemicsPoseId = "<<proxemicsPoseId<<" was not found for environmentId "<<experimentalLocationId<<" in the ExceptionCaseProxemicsPose table."<<endl;
+              SQL_error = true;
+            }
           }
           else
           {
-            cout<<"Pose for exceptionCaseProxemicsPoseId = "<<proxemicsPoseId<<" was not found for environmentId "<< environmentId<<" in the ExceptionCaseProxemicsPose table."<<endl;
+            cout<<"exceptionCaseProxemicsPoseId for sensorId "<<sensorId<<" was not found in the SensorBasedProxemicsPreferences table."<<endl;
             SQL_error = true;
           }
         }
         else
         {
-          cout<<"exceptionCaseProxemicsPoseId for sensorId "<<sensorId<<" was not found in the SensorBasedProxemicsPreferences table."<<endl;
+          cout<<"No sofa sensors are activated now."<<endl;
+        }
+      }
+      else // more than one sofa is activated
+      {
+        cout<<"More than one sofa is activated."<<endl;
+        sql = "SELECT * FROM ExceptionCaseProxemicsPose where exceptionCaseProxemicsPoseId = ";
+        sql += to_string(proxemicsPoseId); //was declare as 0 for default position
+        sql += " and environmentId = ";
+        sql += to_string(experimentalLocationId);
+        cout<<sql<<endl;
+        result = stmt->executeQuery(sql); //Search for the pose of the proxemicsPoseId in the current environment.
+        if (result->next())
+        {
+          targetPose.x=result->getDouble("x");
+          targetPose.y=result->getDouble("y");
+          targetPose.orientation=degree2radian(result->getDouble("orientation"));
+          tf::Stamped<tf::Pose> p = tf::Stamped<tf::Pose>(tf::Pose(tf::createQuaternionFromYaw(targetPose.orientation),
+                                                       tf::Point(targetPose.x, targetPose.y, 0.0)), ros::Time::now(), "map");
+          //Compile the respond message for the client.
+          tf::poseStampedTFToMsg(p, pose); //convert the PoseStamped data into message format and store in pose
+          res.targetPoses.push_back(pose);
+        }
+        else
+        {
+          cout<<"Pose for exceptionCaseProxemicsPoseId = "<<proxemicsPoseId<<" was not found for environmentId "<<experimentalLocationId<<" in the ExceptionCaseProxemicsPose table."<<endl;
           SQL_error = true;
         }
       }
-      else
-      {
-        cout<<"No sofa sensors are activated now."<<endl;
-      }
     }
-    else // more than one sofa is activated
-    {
-      cout<<"More than one sofa is activated."<<endl;
-      sql = "SELECT * FROM ExceptionCaseProxemicsPose where exceptionCaseProxemicsPoseId = ";
-      sql += to_string(proxemicsPoseId); //was declare as 0 for default position
-      sql += " and environmentId = ";
-      sql += environmentId;
-      cout<<sql<<endl;
-      result = stmt->executeQuery(sql); //Search for the pose of the proxemicsPoseId in the current environment.
-      if (result->next())
-      {
-        targetPose.x=result->getDouble("x");
-        targetPose.y=result->getDouble("y");
-        targetPose.orientation=degree2radian(result->getDouble("orientation"));
-        tf::Stamped<tf::Pose> p = tf::Stamped<tf::Pose>(tf::Pose(tf::createQuaternionFromYaw(targetPose.orientation),
-                                                     tf::Point(targetPose.x, targetPose.y, 0.0)), ros::Time::now(), "map");
-        //Compile the respond message for the client.
-        tf::poseStampedTFToMsg(p, pose); //convert the PoseStamped data into message format and store in pose
-        res.targetPoses.push_back(pose);
-      }
-      else
-      {
-        cout<<"Pose for exceptionCaseProxemicsPoseId = "<<proxemicsPoseId<<" was not found for environmentId "<< environmentId<<" in the ExceptionCaseProxemicsPose table."<<endl;
-        SQL_error = true;
-      }
+    else
+      cout<<"No sofa sensor is activated."<<endl;
     }
-  }
-  else
-    cout<<"No sofa sensor is activated."<<endl;
+   else
+   {
+     cout<<"Error retrieving ExperimentalLocationId from SessionControl table."<<endl;
+     SQL_error = true;
+   }
 
 
   delete result;
@@ -374,7 +409,90 @@ void Proxemics::getPotentialProxemicsLocations_Sofa(accompany_context_aware_plan
   con -> close();
   delete con;
 }
+/******************************************************************************
+*
+*  Context-aware Proxemics for user in the Kitchen, regardless of user
+*
+*
+*****************************************************************************/
+void Proxemics::getPotentialProxemicsLocations_Kitchen(accompany_context_aware_planner::GetPotentialProxemicsLocations::Request &req,
+    accompany_context_aware_planner::GetPotentialProxemicsLocations::Response &res)
+{
+  string sql;
+  string currentUserPosture;
+  Pose targetPose;
+  geometry_msgs::PoseStamped pose; //create a PoseStamped variable to store the StampedPost TF
+  int proxemicsPoseId = 0; //default for multiple sofa activations.
+  int locationId = 10; //kitchen
 
+  int experimentalLocationId; //1 = UHRH, 5 = IPA Kitchen
+
+  Driver *driver;
+  Connection *con;
+  Statement *stmt;
+  ResultSet *result;
+
+
+  driver = get_driver_instance();
+  con = driver->connect(DBHOST, USER, PASSWORD); // create a database connection using the Driver
+  con->setAutoCommit(0); // turn off the autocommit
+  con->setSchema(DATABASE); // select appropriate database schema
+  stmt = con->createStatement(); // create a statement object
+
+  sql = "SELECT * FROM SessionControl ";
+  result = stmt->executeQuery(sql);
+  if (result->next())
+  {
+    experimentalLocationId = result->getInt("ExperimentalLocationId");
+
+    sql  = "SELECT * FROM LocationBasedProxemicsPreferences where locationId = ";
+    sql += to_string(locationId);
+    cout<<sql<<endl;
+    result = stmt->executeQuery(sql);       //Search for the preferred proxemicsPoseId for the sofa using its Id.
+    if (result->next())
+    {
+      proxemicsPoseId = result->getInt("exceptionCaseProxemicsPoseId");
+      sql  = "SELECT * FROM ExceptionCaseProxemicsPose where exceptionCaseProxemicsPoseId = ";
+      sql += to_string(proxemicsPoseId);
+      sql += " and environmentId = ";
+      sql += to_string(experimentalLocationId);
+      cout<<sql<<endl;
+      result = stmt->executeQuery(sql);     //Search for the pose of the proxemicsPoseId in the current environment.
+      if (result->next())
+      {
+        targetPose.x=result->getDouble("x");
+        targetPose.y=result->getDouble("y");
+        targetPose.orientation=degree2radian(result->getDouble("orientation"));
+        tf::Stamped<tf::Pose> p = tf::Stamped<tf::Pose>(tf::Pose(tf::createQuaternionFromYaw(targetPose.orientation),
+                                                    tf::Point(targetPose.x, targetPose.y, 0.0)), ros::Time::now(), "map");
+
+        tf::poseStampedTFToMsg(p, pose);    //Convert the PoseStamped data into message format and store in pose.
+        res.targetPoses.push_back(pose);    //Store the pose in the respond message for the client.
+      }
+      else
+      {
+        cout<<"Pose for exceptionCaseProxemicsPoseId = "<<proxemicsPoseId<<" was not found for environmentId "<< experimentalLocationId<<" in the ExceptionCaseProxemicsPose table."<<endl;
+        SQL_error = true;
+      }
+    }
+    else
+    {
+      cout<<"exceptionCaseProxemicsPoseId for Location "<<locationId<<" was not found in the LocationBasedProxemicsPreferences table."<<endl;
+      SQL_error = true;
+    }
+  }
+  else
+  {
+    cout<<"Error retrieving ExperimentalLocationId from SessionControl table."<<endl;
+    SQL_error = true;
+  }
+
+  delete result;
+  delete stmt;
+  con -> close();
+  delete con;
+
+}
 /******************************************************************************
  Retrieve user's proxemics preferences from the database
 
