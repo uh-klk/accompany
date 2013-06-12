@@ -14,12 +14,22 @@
 
 #include <boost/thread.hpp>
 
+using namespace std;
+
 float degree2radian(float degree)
 {
   float radian;
   float pi = 4.0 * std::atan2(1.0, 1.0);
 
   return radian = pi * degree / 180.0;
+}
+
+float radian2degree(float radian)
+{
+  float degree;
+  float pi = 4.0 * std::atan2(1.0, 1.0);
+
+  return degree = 180 * radian / pi;
 }
 
 bool gotoTarget(float x, float y, float theta)
@@ -60,11 +70,11 @@ bool gotoTarget(float x, float y, float theta)
 
 int main(int argc, char **argv)
 {
-  ros::init(argc, argv, "add_two_ints_client");
+  ros::init(argc, argv, "getPotentialProxemics_client");
 
-  if (argc != 4)
+  if (argc != 7)
   {
-    ROS_INFO("usage: getPotentialProxemicsLocations X(m) Y(m) Orientation(deg)");
+    ROS_INFO("usage: getPotentialProxemicsLocations userId userPosture X(m) Y(m) Orientation(deg) robotGenericTaskId ");
 
     return 1;
   }
@@ -76,61 +86,68 @@ int main(int argc, char **argv)
                                                                                                            "get_potential_proxemics_locations");
   accompany_context_aware_planner::GetPotentialProxemicsLocations srv;
 
-  float X = atof(argv[1]);
-  float Y = atof(argv[2]);
-  float deg = atof(argv[3]);
+  float X = atof(argv[3]);
+  float Y = atof(argv[4]);
+  float deg = atof(argv[5]);
 
   srv.request.header.frame_id = "map";
   srv.request.header.stamp = ros::Time::now();
-  srv.request.userId = 1;
-  srv.request.userPosture = 1;
+  srv.request.userId = atoi(argv[1]);
+  srv.request.userPosture = atoi(argv[2]); //2 is sit, 1 is stand
   srv.request.userPose.orientation = tf::createQuaternionMsgFromYaw(degree2radian(deg)); //create Quaternion Msg from Yaw
   tf::pointTFToMsg(tf::Point(X, Y, 0.0), srv.request.userPose.position); //convertTF to Msg then store in the server request container
-  srv.request.robotGenericTaskId = 1;
+  srv.request.robotGenericTaskId = atoi(argv[6]); //int
 
   if (client.call(srv))
   {
-    for (unsigned i = 0; i < srv.response.targetPoses.size(); i++)
+    if (srv.response.targetPoses.size() == 0)
     {
-      /*
-       srv.response.targetPoses[i].header.seq
-       srv.response.targetPoses[i].header.stamp
-       srv.response.targetPoses[i].header.frame_id
-       srv.response.targetPoses[i].pose.position.x
-       srv.response.targetPoses[i].pose.position.y
-       srv.response.targetPoses[i].pose.position.z
-       */
-
-      ROS_INFO("Response target Poses size is:  x=%d", srv.response.targetPoses.size());
-
-      ROS_INFO("Request is:  x=%f, y=%f, z=%f yaw = %f",
-          srv.request.userPose.position.x,
-          srv.request.userPose.position.y,
-          srv.request.userPose.position.z,
-          tf::getYaw(srv.request.userPose.orientation));
-
-      ROS_INFO("MsgSeq = %d, time =  %2f, coordinate frame = %s ",
-          srv.response.targetPoses[i].header.seq,
-          (ros::Time::now().toSec()-srv.response.targetPoses[i].header.stamp.toSec()),
-          srv.response.targetPoses[i].header.frame_id.c_str());
-
-      ROS_INFO("response is: x=%f, y=%f, z=%f yaw = %f",
-          srv.response.targetPoses[i].pose.position.x,
-          srv.response.targetPoses[i].pose.position.y,
-          srv.response.targetPoses[i].pose.position.z,
-          tf::getYaw(srv.response.targetPoses[i].pose.orientation));
-
-
-      if (gotoTarget(srv.response.targetPoses[i].pose.position.x, srv.response.targetPoses[i].pose.position.y,
-                 tf::getYaw(srv.response.targetPoses[i].pose.orientation)) == true)
-        i = srv.response.targetPoses.size();
-
+      cout<<"No valid target pose was found."<<endl;
     }
+    else
+    {
+      for (unsigned i = 0; i < srv.response.targetPoses.size(); i++)
+      {
+        /*
+         srv.response.targetPoses[i].header.seq
+         srv.response.targetPoses[i].header.stamp
+         srv.response.targetPoses[i].header.frame_id
+         srv.response.targetPoses[i].pose.position.x
+         srv.response.targetPoses[i].pose.position.y
+         srv.response.targetPoses[i].pose.position.z
+         */
 
+        ROS_INFO("Response target Poses size is: %d", srv.response.targetPoses.size());
+
+        ROS_INFO("Request is:  x=%f, y=%f, z=%f yaw = %f",
+            srv.request.userPose.position.x,
+            srv.request.userPose.position.y,
+            srv.request.userPose.position.z,
+            radian2degree(tf::getYaw(srv.request.userPose.orientation)));
+
+        ROS_INFO("MsgSeq = %d, time =  %2f, coordinate frame = %s ",
+            srv.response.targetPoses[i].header.seq,
+            (ros::Time::now().toSec()-srv.response.targetPoses[i].header.stamp.toSec()),
+            srv.response.targetPoses[i].header.frame_id.c_str());
+
+        //need to receive something that can be checked for no data
+        ROS_INFO("response is: x=%f, y=%f, z=%f yaw = %f",
+            srv.response.targetPoses[i].pose.position.x,
+            srv.response.targetPoses[i].pose.position.y,
+            srv.response.targetPoses[i].pose.position.z,
+            radian2degree(tf::getYaw(srv.response.targetPoses[i].pose.orientation)));
+
+
+        if (gotoTarget(srv.response.targetPoses[i].pose.position.x, srv.response.targetPoses[i].pose.position.y,
+                   tf::getYaw(srv.response.targetPoses[i].pose.orientation)) == true) //ignore other poses if robot reached current target.
+          i = srv.response.targetPoses.size();
+
+      }
+    }
   }
   else
   {
-    ROS_ERROR("Failed to call service getPotentialProcemicsLocations");
+    ROS_ERROR("Failed to call service getPotentialProcemicsLocations, the service does not exist.");
     return 1;
   }
 
