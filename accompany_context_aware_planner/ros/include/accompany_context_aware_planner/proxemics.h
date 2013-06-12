@@ -53,7 +53,7 @@ public:
 
     map_resolution_ = 0;
 
-    robotRadius = 0.6;
+    robotRadius = 0.6;          //need to manually change this variable based on the robot
     personRadius = 0.4;
 
     static_map_sub_ = node_handle_.subscribe<nav_msgs::OccupancyGrid> ("/map", 1, &Proxemics::updateMapCallback, this);

@@ -70,11 +70,11 @@ bool gotoTarget(float x, float y, float theta)
 
 int main(int argc, char **argv)
 {
-  ros::init(argc, argv, "add_two_ints_client");
+  ros::init(argc, argv, "getPotentialProxemics_client");
 
-  if (argc != 6)
+  if (argc != 7)
   {
-    ROS_INFO("usage: getPotentialProxemicsLocations userId userPosture X(m) Y(m) Orientation(deg)");
+    ROS_INFO("usage: getPotentialProxemicsLocations userId userPosture X(m) Y(m) Orientation(deg) robotGenericTaskId ");
 
     return 1;
   }
@@ -96,7 +96,7 @@ int main(int argc, char **argv)
   srv.request.userPosture = atoi(argv[2]); //2 is sit, 1 is stand
   srv.request.userPose.orientation = tf::createQuaternionMsgFromYaw(degree2radian(deg)); //create Quaternion Msg from Yaw
   tf::pointTFToMsg(tf::Point(X, Y, 0.0), srv.request.userPose.position); //convertTF to Msg then store in the server request container
-  srv.request.robotGenericTaskId = 3;
+  srv.request.robotGenericTaskId = atoi(argv[6]); //int
 
   if (client.call(srv))
   {

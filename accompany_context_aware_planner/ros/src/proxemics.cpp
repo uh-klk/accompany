@@ -199,7 +199,7 @@ bool Proxemics::getPotentialProxemicsLocations(
     }
   }
 
-  ;
+
   //check if there are data in it.
   if ((validDataCount>0) && (SQL_error != true))
   {
