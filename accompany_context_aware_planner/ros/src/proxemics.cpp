@@ -433,6 +433,7 @@ void Proxemics::getPotentialProxemicsLocations_Sofa(accompany_context_aware_plan
   //Determine the experimental location for this user from the SessionControl table
   sql = "SELECT * FROM SessionControl where SessionUser =  ";
   sql += to_string(req.userId);
+  cout<<sql<<endl;
   result = stmt->executeQuery(sql);
   if (result->next())
   {
@@ -455,8 +456,8 @@ void Proxemics::getPotentialProxemicsLocations_Sofa(accompany_context_aware_plan
 
   switch (experimentalLocationId) {
     case 1: //Sofa in RH
-      lastSensorId = 19;
-      firstSensorId = 15;
+      //lastSensorId = 19;
+      //firstSensorId = 15;
       numberOfSofa = 5;
       sofaId[0]=15;
       sofaId[1]=16;
@@ -464,9 +465,15 @@ void Proxemics::getPotentialProxemicsLocations_Sofa(accompany_context_aware_plan
       sofaId[3]=18;
       sofaId[4]=19;
       break;
+    case 2:  //Heerlen
+      numberOfSofa = 3;
+      sofaId[0] = 301; 
+      sofaId[1] = 304;
+      sofaId[2] = 305;
+      break;
     case 4: //IPA Kitchen
-      lastSensorId = 811;
-      firstSensorId = 810;
+      //lastSensorId = 811;
+      //firstSensorId = 810;
       numberOfSofa = 2;
       sofaId[0]=810;
       sofaId[1]=811;
@@ -1336,16 +1343,16 @@ bool Proxemics::validApproachPosition(Pose personLocation, Pose robotLocation, P
   //cv::line(expanded_map_with_person, convertFromMeterToPixelCoordinates<cv::Point>(Pose(1.f,0.2f,0.f)), convertFromMeterToPixelCoordinates<cv::Point>(Pose(-1.f,0.2f,0.f)), cv::Scalar(0,0,0,0), 2);
   //cv::line(map_, convertFromMeterToPixelCoordinates<cv::Point>(Pose(1.f,0.2f,0.f)), convertFromMeterToPixelCoordinates<cv::Point>(Pose(-1.f,0.2f,0.f)), cv::Scalar(0,0,0,0), 2);
 
-/*//To Display the results
- *
-  //cv::imshow("contour areas", expanded_map_with_person);
+//To Display the results
+ 
+  cv::imshow("contour areas", expanded_map_with_person);
 
   cv::Mat expanded_map_with_person_flip;
   cv::flip(expanded_map_with_person, expanded_map_with_person_flip,0);
   cv::imshow("contour areas flip",expanded_map_with_person_flip);
 
   cv::waitKey(100);
-*/
+
 
   // Eliminate poses that could not be reach by the robot based on static map
   // i.e. check whether potentialApproachPose and robotLocation are in the same area (=same contour)
@@ -1421,10 +1428,10 @@ void Proxemics::updateMapCallback(const nav_msgs::OccupancyGridConstPtr& map_msg
   //std::cout << "iterations=" << iterations << std::endl;
   cv::erode(map_, expanded_map_, cv::Mat(), cv::Point(-1, -1), iterations);
 
-  // display maps
-  //            cv::imshow("blown up map", expanded_map_);
-  //            cv::imshow("map", map_);
-  //            cv::waitKey(10);
+//  display maps
+    cv::imshow("blown up map", expanded_map_);
+    cv::imshow("map", map_);
+    cv::waitKey(10);
 
 
   ROS_INFO("Map received.");
