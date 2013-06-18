@@ -36,7 +36,7 @@ rosbuild_gensrv()
 #mysql
 #include_directories(/usr/local/include/cppconn/)
 #include_directories(/usr/local/include/)
-#link_directories(/usr/local/lib/) 
+link_directories(/usr/local/lib/) 
 
 
 rosbuild_add_executable(accompany_context_aware_planner ros/src/ContextAwarePlanner.cpp

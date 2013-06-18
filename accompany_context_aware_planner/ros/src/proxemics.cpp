@@ -417,6 +417,7 @@ void Proxemics::getPotentialProxemicsLocations_Sofa(accompany_context_aware_plan
 
   int locationId, ValidRobotLocation, closestValidRobotLocation;
   int experimentalLocationId; //1 = UHRH, 5 = IPA Kitchen
+  int i=0;
 
   Driver *driver;
   Connection *con;
@@ -449,14 +450,26 @@ void Proxemics::getPotentialProxemicsLocations_Sofa(accompany_context_aware_plan
     return;
   }
 
+  int numberOfSofa;
+  int sofaId[10];
+
   switch (experimentalLocationId) {
     case 1: //Sofa in RH
       lastSensorId = 19;
       firstSensorId = 15;
+      numberOfSofa = 5;
+      sofaId[0]=15;
+      sofaId[1]=16;
+      sofaId[2]=17;
+      sofaId[3]=18;
+      sofaId[4]=19;
       break;
     case 4: //IPA Kitchen
       lastSensorId = 811;
       firstSensorId = 810;
+      numberOfSofa = 2;
+      sofaId[0]=810;
+      sofaId[1]=811;
       break;
     default:
       cout<<"experimentalLocationId for "<<experimentalLocationId<<"is not set in this program"<<endl;
@@ -464,11 +477,18 @@ void Proxemics::getPotentialProxemicsLocations_Sofa(accompany_context_aware_plan
   }
 
   //check if user is in same location as sensors
-  sql = "SELECT locationId FROM Sensors where sensorId <= ";
-  sql+= to_string(lastSensorId);
+  sql = "SELECT locationId FROM Sensors where sensorId = ";
+  /*sql+= to_string(lastSensorId);
   sql+= " and sensorId >= ";
   sql+= to_string(firstSensorId);
-  sql+= " and value = 1";
+  sql+= " and value = 1";*/
+  sql+= to_string(sofaId[0]);
+  for (i=1; i<numberOfSofa; i++)
+  {
+	  sql+= " || sensorId = ";
+	  sql+= to_string(sofaId[i]);
+  }
+
   cout<<sql<<endl;
   result = stmt->executeQuery(sql);     //Search for the number of occupied sofa.
   if (result->next())
@@ -514,22 +534,46 @@ void Proxemics::getPotentialProxemicsLocations_Sofa(accompany_context_aware_plan
     return;
   }
 
-  sql = "SELECT COUNT(*) FROM Sensors where sensorId <= ";
+/*sql = "SELECT COUNT(*) FROM Sensors where sensorId <= ";
   sql+= to_string(lastSensorId);
   sql+= " and sensorId >= ";
   sql+= to_string(firstSensorId);
   sql+= " and value = 1";
+*/
+
+  sql = "SELECT COUNT(*) FROM Sensors where ( ";
+  sql += " sensorId = ";
+  sql+= to_string(sofaId[0]);
+  for (i=1; i<numberOfSofa; i++)
+  {
+	  sql += " or sensorId = ";
+	  sql+= to_string(sofaId[i]);
+  }
+  sql+= ") and value = 1";
+
   cout<<sql<<endl;
   result = stmt->executeQuery(sql);     //Search for the number of occupied sofa.
   if (result->next())
   {
     if (result->getInt("COUNT(*)") == 1)  //If only one sofa is occupied
     {
-      sql = "SELECT * FROM Sensors where sensorId <= ";
+/*    sql = "SELECT * FROM Sensors where sensorId <= ";
       sql+= to_string(lastSensorId);
       sql+= " and sensorId >= ";
       sql+= to_string(firstSensorId);
       sql+= " and value = 1";
+*/
+      sql = "SELECT * FROM Sensors where ( ";
+      sql += " sensorId = ";
+      sql+= to_string(sofaId[0]);
+
+      for (i=1; i<numberOfSofa; i++)
+   	  {
+   		  sql += " or sensorId = ";
+   		  sql+= to_string(sofaId[i]);
+   	  }
+      sql+= ") and value = 1";
+
       cout<<sql<<endl;
       result = stmt->executeQuery(sql); //Which Sofa is occupied?
       if (result->next())
@@ -594,13 +638,25 @@ void Proxemics::getPotentialProxemicsLocations_Sofa(accompany_context_aware_plan
     else // more than one sofa is activated
     {
       cout<<"More than one sofa is activated."<<endl;
-      //
-     //sql = "SELECT locationId FROM Sensors where sensorId <= 19 and sensorId >= 15 and value = 1"; //Sofa
-      sql = "SELECT * FROM Sensors where sensorId <= ";
+
+      //sql = "SELECT locationId FROM Sensors where sensorId <= 19 and sensorId >= 15 and value = 1"; //Sofa
+/*    sql = "SELECT * FROM Sensors where sensorId <= ";
       sql+= to_string(lastSensorId);
       sql+= " and sensorId >= ";
       sql+= to_string(firstSensorId);
       sql+= " and value = 1";
+*/
+      sql = "SELECT locationId FROM Sensors where ( ";
+      sql += " sensorId = ";
+      sql+= to_string(sofaId[0]);
+
+      for (i=1; i<numberOfSofa; i++)
+   	  {
+   		  sql += " or sensorId = ";
+   		  sql+= to_string(sofaId[i]);
+   	  }
+      sql+= ") and value = 1";
+
       cout<<sql<<endl;
       result = stmt->executeQuery(sql);
       if (result->next())
