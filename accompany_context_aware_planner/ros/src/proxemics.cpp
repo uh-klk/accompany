@@ -143,7 +143,7 @@ bool Proxemics::getPotentialProxemicsLocations(
 
 
   //if user is sitting
-  if (req.userPosture == 2)    //sitting on sofa
+  /*if (req.userPosture == 2)    //sitting on sofa
   {
     //getsensorlocation id and check if user is in locationid
 
@@ -157,8 +157,15 @@ bool Proxemics::getPotentialProxemicsLocations(
       return true;
     }
   }
+  */
+  if(getPotentialProxemicsLocations_ExceptionCase(req,res) == true)
+  {
+    cout<<"Done processing ExceptionCase."<<endl;
+    //cout<<SQL_error<<endl;
+  }
   else if (req.userPosture == 1) //standing
   {
+    SQL_error = false;  //reset it to false incase it was set by getPotentialProxemicsLocations_ExceptionCase
     if(getPotentialProxemicsLocations_Standing(req,res) == false)
       cout<<"Error!"<<endl;
 
@@ -209,7 +216,7 @@ Pose personLocation(req.userPose.position.x, req.userPose.position.y, tf::getYaw
   con->setSchema(DATABASE); // select appropriate database schema
   stmt = con->createStatement(); // create a statement object
 
-    //retrieved user's locationId
+  //retrieved user's locationId
   sql  = "SELECT locationId FROM Users WHERE userId = ";
   sql += to_string(req.userId);
   cout<<sql<<endl;
@@ -249,8 +256,10 @@ Pose personLocation(req.userPose.position.x, req.userPose.position.y, tf::getYaw
 
     retrieveProxemicsPreferences_ranking(req.userId, req.robotGenericTaskId, ranked_bearing);
     if (SQL_error == true)
+    {
+      cout<<"Error after retrieveProxemicsPreferences_ranking."<<endl;
       return false; //true;
-
+    }
     //To do //search based on distance  //search based on orientation
     for(int i=0; i<21; i++)
     {
@@ -336,17 +345,24 @@ Pose personLocation(req.userPose.position.x, req.userPose.position.y, tf::getYaw
     cout<<"Sending pose(s) out."<<endl;
     return true;
   }
+
 }
-/************************************************************************************************/
-bool Proxemics::isUserIn(int userId, string locationName)
+
+
+bool Proxemics::getPotentialProxemicsLocations_ExceptionCase(accompany_context_aware_planner::GetPotentialProxemicsLocations::Request &req,
+                            accompany_context_aware_planner::GetPotentialProxemicsLocations::Response &res)
 {
-  string sql;
-  int locationId;
+  int userLocationId;
+  Pose targetPose;
+  geometry_msgs::PoseStamped pose; //create a PoseStamped variable to store the StampedPost TF
+  int ValidRobotLocation, closestValidRobotLocation;
 
   Driver *driver;
   Connection *con;
   Statement *stmt;
   ResultSet *result;
+
+  string sql;
 
   driver = get_driver_instance();
   con = driver->connect(DBHOST, USER, PASSWORD); // create a database connection using the Driver
@@ -354,52 +370,172 @@ bool Proxemics::isUserIn(int userId, string locationName)
   con->setSchema(DATABASE); // select appropriate database schema
   stmt = con->createStatement(); // create a statement object
 
-  //determine if the current session user is in the Living Room
-  sql = "SELECT L.locationId from Locations L where L.name = '";
-  sql += locationName;
-  sql += "'";
-  cout << sql << endl;
+  sql = "SELECT * FROM Users where userId =  ";
+  sql += to_string(req.userId);
+  cout<<sql<<endl;
   result = stmt->executeQuery(sql);
   if (result->next())
   {
-    locationId = result->getInt("locationId");
-
-    cout << "**********Current user location id is = " << locationId << endl;
-
-    sql = "call spCheckUserLocation( ";
-    sql += to_string(userId);
-    sql += ",";
-    sql += to_string(locationId);
-    sql += ",";
-    sql += "@res)";
-    cout << sql << endl;
-    if (stmt->execute(sql)) // return row , if rowcnt >= 1 user is in Living Room
-    {
-      delete result;
-      delete stmt;
-      con->close();
-      delete con;  //this is to avoid issue where the "spCheckUserLocation" not returning when rowcnt = null?
-      cout << "User is in the "<<locationName <<endl; //check which sofa the user is sitting
-
-      return true;
-    }
-    else
-      {
-        delete result;
-        delete stmt;
-        con->close();
-        delete con;  //this is to avoid issue where the "spCheckUserLocation" not returning when rowcnt = null?
-        cout << "User is not in the "<<locationName<<endl; //check which sofa the user is sitting
-
-        return false; //user is not in living room
-      }
+    userLocationId = result->getInt("locationId");
   }
   else
   {
-    cout<<"No locationId for "<<locationName<<" was found in the Locations table."<<endl;
+    cout<<"Error retrieving user's locationId from userId in Users table."<<endl;
     SQL_error = true;
+
+    delete result;
+    delete stmt;
+    con->close();
+    delete con;
     return false;
   }
+
+  /*
+   SELECT
+     e.*
+   FROM
+     ExceptionCaseProxemicsPose e
+     INNER JOIN SensorBasedProxemicsPreferences p ON p.exceptionCaseProxemicsPoseId = e.exceptionCaseProxemicsPoseId
+     INNER JOIN Sensors s ON s.sensorID = p.sensorID
+   WHERE
+     s.locationId = 14 AND (
+        s.status = 'On' OR
+        s.status = 'Open' OR
+        s.status = 'Occupied')
+   */
+  sql = "SELECT \
+           COUNT(e.environmentId) as `count` \
+         FROM \
+           ExceptionCaseProxemicsPose e \
+           INNER JOIN SensorBasedProxemicsPreferences p ON p.exceptionCaseProxemicsPoseId = e.exceptionCaseProxemicsPoseId \
+           INNER JOIN Sensors s ON s.sensorId = p.sensorId \
+         WHERE \
+           s.locationId = ";
+   sql += to_string(userLocationId);
+   sql += " AND ( \
+         s.status = 'On' OR \
+         s.status = 'Open' OR \
+         s.status = 'Occupied')";
+   cout<<sql<<endl;
+   result = stmt->executeQuery(sql);     //Search for the pose of the proxemicsPoseId in the current environment.
+   if (result->next())
+   {
+     int count = result->getInt("count");
+
+     if (count == 0)
+     {
+       cout<<"Sensor based proxemics were not found in ExceptionCaseProxemicsPose table, switching to general proxemics processing."<<endl;
+       SQL_error = true;
+       delete result;
+       delete stmt;
+       con->close();
+       delete con;
+       return false;
+     }
+     else if (count == 1)
+     {
+       sql = " SELECT \
+                 e.* \
+               FROM \
+                 ExceptionCaseProxemicsPose e \
+                 INNER JOIN SensorBasedProxemicsPreferences p ON p.exceptionCaseProxemicsPoseId = e.exceptionCaseProxemicsPoseId \
+                 INNER JOIN Sensors s ON s.sensorId = p.sensorId \
+               WHERE \
+                 s.locationId = ";
+         sql += to_string(userLocationId);
+         sql += " AND ( s.status = 'On' OR \
+                        s.status = 'Open' OR \
+                        s.status = 'Occupied')";
+         cout<<sql<<endl;
+         result = stmt->executeQuery(sql);     //Search for the pose of the proxemicsPoseId in the current environment.
+         if (result->next())
+         {
+           targetPose.x=result->getDouble("x");
+           targetPose.y=result->getDouble("y");
+           targetPose.orientation=degree2radian(result->getDouble("orientation"));
+           tf::Stamped<tf::Pose> p = tf::Stamped<tf::Pose>(tf::Pose(tf::createQuaternionFromYaw(targetPose.orientation),
+                                                                    tf::Point(targetPose.x, targetPose.y, 0.0)), ros::Time::now(), "map");
+           tf::poseStampedTFToMsg(p, pose);    //Convert the PoseStamped data into message format and store in pose.
+           res.targetPoses.push_back(pose);    //Store the pose in the respond message for the client.
+           cout<<"Done processing - Found user triggering sensor based proxemics."<<endl;
+         }
+         else
+         {
+           cout<<"Sensor based proxemics were not found in ExceptionCaseProxemicsPose table, switching to general proxemics processing."<<endl;
+           SQL_error = true;
+           delete result;
+           delete stmt;
+           con->close();
+           delete con;
+           return false;
+         }
+
+     }
+     else if (count >=1 )
+     {
+       sql = "SELECT * FROM Locations WHERE locationId = ";
+       sql+= to_string(userLocationId);
+       cout<<sql<<endl;
+       result = stmt->executeQuery(sql);
+       if (result->next())
+       {
+         ValidRobotLocation = result->getInt("ValidRobotLocation");
+         while (!ValidRobotLocation)     //find a valid robot location near the sofa locationId
+         {
+           closestValidRobotLocation = result->getInt("closestValidRobotLocation");
+           sql = "SELECT * FROM Locations WHERE locationId = ";
+           sql+= to_string(closestValidRobotLocation);
+           cout<<sql<<endl;
+           result = stmt->executeQuery(sql);
+           if (result->next())
+           {
+             ValidRobotLocation = result->getInt("ValidRobotLocation");
+           }
+           else
+           {
+             SQL_error = true;
+             cout<<"SQL_error!!!, no ValidRobotLocation can be found."<<endl;
+             return false;
+           }
+         }
+         targetPose.x=result->getDouble("xCoord");
+         targetPose.y=result->getDouble("yCoord");
+         targetPose.orientation=degree2radian(result->getDouble("orientation"));
+         tf::Stamped<tf::Pose> p = tf::Stamped<tf::Pose>(tf::Pose(tf::createQuaternionFromYaw(targetPose.orientation),
+                                                                  tf::Point(targetPose.x, targetPose.y, 0.0)), ros::Time::now(), "map");
+         tf::poseStampedTFToMsg(p, pose);    //Convert the PoseStamped data into message format and store in pose.
+         res.targetPoses.push_back(pose);    //Store the pose in the respond message for the client.
+         cout<<"Done processing user on sofa in living room"<<endl;
+         delete result;
+         delete stmt;
+         con -> close();
+         delete con;
+         return true;
+       }
+       else
+       {
+         SQL_error = true;
+         cout<<"Sofa's locationId not found."<<endl;
+         delete result;
+         delete stmt;
+         con -> close();
+         delete con;
+         return false;
+       }
+     }
+   }
+   else
+   {
+     cout<<"Sensor based proxemics were not found in ExceptionCaseProxemicsPose table, switching to general proxemics processing."<<endl;
+     SQL_error = true;
+     delete result;
+     delete stmt;
+     con->close();
+     delete con;
+     return false;
+   }
+
+  return true;
 }
 /******************************************************************************
  * Context-aware Proxemics for sofa, regardless of user
@@ -658,10 +794,10 @@ void Proxemics::getPotentialProxemicsLocations_Sofa(accompany_context_aware_plan
       sql+= to_string(sofaId[0]);
 
       for (i=1; i<numberOfSofa; i++)
-   	  {
-   		  sql += " or sensorId = ";
-   		  sql+= to_string(sofaId[i]);
-   	  }
+      {
+   	sql += " or sensorId = ";
+   	sql+= to_string(sofaId[i]);
+      }
       sql+= ") and value = 1";
 
       cout<<sql<<endl;
@@ -745,6 +881,7 @@ void Proxemics::getPotentialProxemicsLocations_Sofa(accompany_context_aware_plan
     return;
   }
 }
+
 /******************************************************************************
 *
 *  Context-aware Proxemics for user in the Kitchen, regardless of user
@@ -953,6 +1090,70 @@ Proxemics::Bearing Proxemics::retrieveProxemicsPreferences(int userId, int robot
   delete con;
 
   return bearing;
+}
+/************************************************************************************************/
+bool Proxemics::isUserIn(int userId, string locationName)
+{
+  string sql;
+  int locationId;
+
+  Driver *driver;
+  Connection *con;
+  Statement *stmt;
+  ResultSet *result;
+
+  driver = get_driver_instance();
+  con = driver->connect(DBHOST, USER, PASSWORD); // create a database connection using the Driver
+  con->setAutoCommit(0); // turn off the autocommit
+  con->setSchema(DATABASE); // select appropriate database schema
+  stmt = con->createStatement(); // create a statement object
+
+  //determine if the current session user is in the Living Room
+  sql = "SELECT L.locationId from Locations L where L.name = '";
+  sql += locationName;
+  sql += "'";
+  cout << sql << endl;
+  result = stmt->executeQuery(sql);
+  if (result->next())
+  {
+    locationId = result->getInt("locationId");
+
+    cout << "**********Current user location id is = " << locationId << endl;
+
+    sql = "call spCheckUserLocation( ";
+    sql += to_string(userId);
+    sql += ",";
+    sql += to_string(locationId);
+    sql += ",";
+    sql += "@res)";
+    cout << sql << endl;
+    if (stmt->execute(sql)) // return row , if rowcnt >= 1 user is in Living Room
+    {
+      delete result;
+      delete stmt;
+      con->close();
+      delete con;  //this is to avoid issue where the "spCheckUserLocation" not returning when rowcnt = null?
+      cout << "User is in the "<<locationName <<endl; //check which sofa the user is sitting
+
+      return true;
+    }
+    else
+      {
+        delete result;
+        delete stmt;
+        con->close();
+        delete con;  //this is to avoid issue where the "spCheckUserLocation" not returning when rowcnt = null?
+        cout << "User is not in the "<<locationName<<endl; //check which sofa the user is sitting
+
+        return false; //user is not in living room
+      }
+  }
+  else
+  {
+    cout<<"No locationId for "<<locationName<<" was found in the Locations table."<<endl;
+    SQL_error = true;
+    return false;
+  }
 }
 /******************************************************************************
  Retrieve user's proxemics preferences from the database
