@@ -83,7 +83,7 @@ int main(int argc, char **argv)
   ros::ServiceClient
                      client =
                          n.serviceClient<accompany_context_aware_planner::GetPotentialProxemicsLocations> (
-                                                                                                           "get_potential_proxemics_locations");
+                                                                                                           "accompany_context_aware_planner/get_potential_proxemics_locations");
   accompany_context_aware_planner::GetPotentialProxemicsLocations srv;
 
   float X = atof(argv[3]);
