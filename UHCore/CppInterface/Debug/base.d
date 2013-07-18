@@ -1,4 +1,4 @@
-base.d: ../base.cpp ../history.h ../base.h \
+base.d base.o: ../base.cpp ../history.h ../base.h \
  /usr/include/python2.6/Python.h /usr/include/python2.6/patchlevel.h \
  /usr/include/python2.6/pyconfig.h /usr/include/python2.6/pymacconfig.h \
  /usr/include/python2.6/pyport.h /usr/include/python2.6/pymath.h \

@@ -1,4 +1,4 @@
-#include "history.h"
+#include "include/history.h"
 #include "Python.h"
 #include <string>
 #include <iostream>
@@ -6,13 +6,15 @@
 
 ActionHistory::ActionHistory(std::string modulePath) :
 		PythonInterface(modulePath) {
+	pInstance = NULL;
+}
+
+PyObject* ActionHistory::getDefaultClassInstance() {
+	if (pInstance == NULL) {
+		pInstance = getClassInstance("history", "ActionHistory", NULL);
 	}
 
-std::string ActionHistory::getModuleName() {
-	return "history";
-}
-std::string ActionHistory::getClassName() {
-	return "ActionHistory";
+	return pInstance;
 }
 
 bool ActionHistory::cancelPollingHistory(std::string ruleName) {
@@ -27,16 +29,13 @@ bool ActionHistory::cancelPollingHistory(std::string ruleName) {
 	return ret;
 }
 
-char* ActionHistory::addPollingHistory(std::string ruleName, float delaySeconds) {
+char* ActionHistory::addPollingHistory(std::string ruleName,
+		float delaySeconds) {
 
 	char* m = strdup("addPollingHistory");
 	char* f = strdup("(sf)");
-	PyObject *pValue = PyObject_CallMethod(
-			getClassInstance(),
-			m,
-			f,
-			ruleName.c_str(),
-			delaySeconds);
+	PyObject *pValue = PyObject_CallMethod(getDefaultClassInstance(), m, f,
+			ruleName.c_str(), delaySeconds);
 
 	if (pValue != NULL) {
 		char* ret = PyString_AsString(pValue);

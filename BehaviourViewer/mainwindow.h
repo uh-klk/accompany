@@ -3,6 +3,9 @@
 
 #include <QMainWindow>
 #include <QtSql>
+#include <QPrinter>
+#include <QPrintDialog>
+#include <QPainter>
 
 namespace Ui {
     class MainWindow;
@@ -30,6 +33,7 @@ private slots:
     void on_checkBox_2_toggled(bool checked);
     void on_checkBox_toggled(bool checked);
     void on_comboBox_currentIndexChanged(QString );
+    void on_pushButton_clicked();
 };
 
 #endif // MAINWINDOW_H
