@@ -36,10 +36,10 @@ private slots:
     void on_sofa3CheckBox_toggled(bool checked);
     void on_sofa2CheckBox_toggled(bool checked);
     void on_pushButton_clicked();
-    void on_cupSpinBox_valueChanged(int );
     void on_fridgeCheckBox_toggled(bool checked);
     void on_sofa1CheckBox_toggled(bool checked);
     void on_pushButton_2_clicked();
+    void on_cupCheckBox_clicked(bool checked);
 };
 
 #endif // MAINWINDOW_H

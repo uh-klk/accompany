@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1288</width>
-    <height>582</height>
+    <height>822</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -19,8 +19,8 @@
      <rect>
       <x>0</x>
       <y>60</y>
-      <width>361</width>
-      <height>471</height>
+      <width>401</width>
+      <height>701</height>
      </rect>
     </property>
     <property name="sizePolicy">
@@ -77,8 +77,8 @@
    <widget class="QLabel" name="userlabel">
     <property name="geometry">
      <rect>
-      <x>0</x>
-      <y>530</y>
+      <x>910</x>
+      <y>670</y>
       <width>161</width>
       <height>16</height>
      </rect>
@@ -90,9 +90,9 @@
    <widget class="QTableWidget" name="SQLtableWidget">
     <property name="geometry">
      <rect>
-      <x>360</x>
+      <x>400</x>
       <y>60</y>
-      <width>921</width>
+      <width>881</width>
       <height>331</height>
      </rect>
     </property>
@@ -161,10 +161,10 @@
    <widget class="QTableWidget" name="logTableWidget">
     <property name="geometry">
      <rect>
-      <x>360</x>
+      <x>400</x>
       <y>390</y>
-      <width>921</width>
-      <height>141</height>
+      <width>881</width>
+      <height>271</height>
      </rect>
     </property>
     <property name="horizontalScrollMode">
@@ -255,8 +255,8 @@
    <widget class="QPushButton" name="testPlannerPushButton">
     <property name="geometry">
      <rect>
-      <x>370</x>
-      <y>530</y>
+      <x>430</x>
+      <y>670</y>
       <width>102</width>
       <height>24</height>
      </rect>
@@ -268,8 +268,8 @@
    <widget class="QPushButton" name="enableDebugPushButton">
     <property name="geometry">
      <rect>
-      <x>490</x>
-      <y>530</y>
+      <x>550</x>
+      <y>670</y>
       <width>131</width>
       <height>24</height>
      </rect>
@@ -284,8 +284,8 @@
    <widget class="QLabel" name="label_2">
     <property name="geometry">
      <rect>
-      <x>660</x>
-      <y>530</y>
+      <x>720</x>
+      <y>670</y>
       <width>31</width>
       <height>21</height>
      </rect>
@@ -302,8 +302,8 @@
    <widget class="QGroupBox" name="GUIgroupBox">
     <property name="geometry">
      <rect>
-      <x>690</x>
-      <y>530</y>
+      <x>750</x>
+      <y>670</y>
       <width>231</width>
       <height>21</height>
      </rect>

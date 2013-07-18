@@ -30,7 +30,7 @@ int globalActionCount;
 
 int andCount;
 
-int experimentLocation;   // 1 = UH, 2=HUYT 3=Madopa
+int experimentLocation;   // 1 = UH, 2=ZUYD, 3=Madopa
 int defaultUserId;
 
 
@@ -981,8 +981,15 @@ void MainWindow::on_addRuleButton_clicked()
 
         QString QuestionLocationId = ui->robotLocationComboBox->currentText().section("::", 1, 1);
         QString QuestionRobotId    = ui->robotLocationRobotComboBox->currentText().section("::", 1, 1);
+        QString QuestionUserId     = ui->userLocationUserComboBox->currentText().section("::", 1, 1);
 
-        rule = "SELECT locationId FROM Robot WHERE (locationId IN (\
+        if (QuestionLocationId == "999")
+        {
+            rule = "SELECT r.locationId, u.locationId FROM Robot r, Users u WHERE u.userid = " + QuestionUserId + " AND r.robotId = " + QuestionRobotId + " AND r.locationId = u.locationId";
+        }
+        else
+        {                                                                   // complex rule due to hierachy of locns
+           rule = "SELECT locationId FROM Robot WHERE (locationId IN (\
                   SELECT c.locationId FROM (\
                       SELECT b.* FROM Locations a, Locations b\
                       WHERE  a.locationId = " + QuestionLocationId +
@@ -998,13 +1005,8 @@ void MainWindow::on_addRuleButton_clicked()
                          AND robotId = " + QuestionRobotId + ") or\
                          (" + QuestionLocationId + " = 0 and robotId = " + QuestionRobotId + ")";
 
-        rule=rule.simplified();
-
-
-
-
-
-
+            rule=rule.simplified();
+          }
 
         action = "";
 
@@ -1345,10 +1347,10 @@ void MainWindow::on_addRuleButton_clicked()
 
 
            fillRuleActionTable("ZUYD Cup",
-                               300,
-                               "Level",
+                               307,
+                               "Full:Empty",
                                ui->cupLevelCheckBox->isChecked(),
-                               ui->cupLevelSpinBox->value(),
+                               ui->HUYTCupFullRadioButton->isChecked(),
                                ui->cupLevelANDRadioButton->isChecked(),
                                ui->cupLevelORRadioButton->isChecked());
 
@@ -1945,7 +1947,7 @@ void MainWindow::on_addActionButton_clicked()
        QString height;
        height.setNum(ui->apSpinBox->value());
 
-       actiontext = "Change Action Possibility " + ui->apComboBox->currentText() + " by " + height ;
+       actiontext = "Change Action Possibility " + ui->apComboBox->currentText() + " to " + height ;
 
        action = "APoss,"+ ui->robotComboBox->currentText().section("::", 1, 1) + "," + ui->apComboBox->currentText().section("::", 1, 1) + "," + height;
 
@@ -3312,10 +3314,12 @@ void MainWindow::resetGui()
     ui->HUYTLRS3ANDRadioButton->setChecked(true);
     ui->HUYTLRS3ORRadioButton->setEnabled(false);
 
-    ui->cupLevelSpinBox->setEnabled(false);
+    ui->HUYTCupEmptyRadioButton->setEnabled(false);
+    ui->HUYTCupFullRadioButton->setEnabled(false);
     ui->cupLevelANDRadioButton->setEnabled(false);
     ui->cupLevelANDRadioButton->setChecked(true);
     ui->cupLevelORRadioButton->setEnabled(false);
+    ui->HUYTCupEmptyRadioButton->setChecked(true);
 
     ui->ZUYDDoorbellOffRadioButton->setEnabled(false);
     ui->ZUYDDoorbellOnRadioButton->setEnabled(false);
@@ -4745,6 +4749,7 @@ void MainWindow::on_Goal1CheckBox_toggled(bool checked)
     ui->Goal1ComboBox->setEnabled(checked);
     ui->Goal1LineEdit->setEnabled(checked);
 
+    qDebug()<<ruleCount;
 
     if (checked)
     {
@@ -4933,7 +4938,8 @@ void MainWindow::on_HUYTlivingSofa1CheckBox_toggled(bool checked)
 
 void MainWindow::on_cupLevelCheckBox_toggled(bool checked)
 {
-    ui->cupLevelSpinBox->setEnabled(checked);
+    ui->HUYTCupEmptyRadioButton->setEnabled(checked);
+    ui->HUYTCupFullRadioButton->setEnabled(checked);
     ui->cupLevelANDRadioButton->setEnabled(checked);
     ui->cupLevelORRadioButton->setEnabled(checked);
 

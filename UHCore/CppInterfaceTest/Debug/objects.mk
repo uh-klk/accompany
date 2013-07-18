@@ -4,5 +4,5 @@
 
 USER_OBJS :=
 
-LIBS := -lUHCore -lpython2.6
+LIBS := -lUHCore -lpython2.7
 
