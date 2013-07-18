@@ -377,7 +377,7 @@ void MainWindow::getLocations()
 
 
 
-   locQuery = "SELECT value from Sensors where sensorId = 300 LIMIT 1";
+   locQuery = "SELECT value from Sensors where sensorId = 307 LIMIT 1";
 
    query = locQuery;
 
@@ -385,7 +385,7 @@ void MainWindow::getLocations()
 
    while(query.next())
    {
-      ui->cupSpinBox->setValue(query.value(0).toInt());
+      ui->cupCheckBox->setChecked(query.value(0).toBool());
    }
 
    locQuery = "SELECT value from Sensors where sensorId = 303 LIMIT 1";
@@ -507,20 +507,7 @@ void MainWindow::on_fridgeCheckBox_toggled(bool checked)
     updateSensorLog(303, !checked, stat);
 }
 
-void MainWindow::on_cupSpinBox_valueChanged(int v )
-{
-    if (firstTime) return;
 
-    QString stat = "Full";
-    if (v > 3)
-    {
-       stat = "Empty";
-    }
-
-    updateSensorLog(300, v, stat);
-
-
-}
 
 void MainWindow::on_pushButton_clicked()
 {
@@ -575,6 +562,20 @@ void MainWindow::on_trayCheckBox_toggled(bool checked)
     updateSensorLog(500, checked, stat);
 }
 
+void MainWindow::on_cupCheckBox_clicked(bool checked)
+{
+    if (firstTime) return;
+
+    QString stat = "Empty";
+    if (checked)
+    {
+       stat = "Full";
+    }
+
+    updateSensorLog(307, checked, stat);
+
+}
+
 
 void MainWindow::on_robotLocationComboBox_currentIndexChanged(QString locn)
 {
@@ -602,3 +603,5 @@ void MainWindow::on_userLocationComboBox_currentIndexChanged(QString locn)
 
     query.exec();
 }
+
+
