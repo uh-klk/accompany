@@ -48,7 +48,6 @@ std::string vectorPrint(vector<T> v) {
 #define ACTIONGOALS_DB_ERROR_UPDATE 6
 #define SCRIPTSERVER_EXECUTION_FAILURE 7
 
-bool terminationAllowed;
 
 class schedulerThread : public QThread {
     protected:
@@ -362,7 +361,7 @@ bool MainWindow::fillSequenceTable()
     if (ui->showNonSchedcheckBox->isChecked())
     {
         QString qry = "SELECT name, priority, IF(interruptable,'Yes','No')FROM Sequences Where experimentalLocationId = "\
-                      + houseLocation + " ORDER BY schedulable DESC, priority DESC, RAND()" ;
+                      + houseLocation + " ORDER BY name"; //schedulable DESC, priority DESC, RAND()" ;
 
         if (!query.exec(qry))
         {
@@ -525,7 +524,7 @@ void MainWindow::on_sequenceTableWidget_cellClicked(int row, int column)
 
 
     QStringList labs;
-    labs << "Behaviour" << "Rule/Action" << "Rule Order" << "Description" << "And/Or" << "True/False";
+    labs << "Behaviour" << "Rule/Action" << "Order" << "Description" << "And/Or" << "True/False";
     ui->SQLtableWidget->setHorizontalHeaderLabels(labs);
 
 
@@ -832,6 +831,30 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
       pname1 = str.section(',', 3, 3);
       wait  = str.section(',', 4, 4);
 
+      // lock the Sienna GUI if doing anything but sleeping
+
+      QSqlQuery Lockquery(db7);
+
+      Lockquery.clear();
+
+      if (cname == "tray" || cname == "base" || cname == "torso" || cname == "eyes" || cname == "head" || cname == "arm" )
+      {
+          Lockquery.prepare("UPDATE Sensors SET value = 1 WHERE sensorId = 1001");
+   //       sleep(5);
+   //       qDebug()<<"Set progress to 1";
+      }
+      else
+      {
+           Lockquery.prepare("UPDATE Sensors SET value = 0 WHERE sensorId = 1001");
+   //                  qDebug()<<"Set progress to 0";
+      }
+
+      if (!Lockquery.exec())
+      {
+         returnResult = ACTIONRULES_DB_ERROR_UPDATE;
+         return returnResult;
+      }
+
       bool blocking = false;
 
       if (wait == "wait")
@@ -913,7 +936,7 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
       // -----------
 
 
-      if (cname == "tray" || cname == "base" || cname == "torso" || cname == "eyes" || cname == "head" )
+      if (cname == "tray" || cname == "base" || cname == "torso" || cname == "eyes" || cname == "head" || cname == "arm" )
       {
 
 
@@ -1006,11 +1029,17 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
 
              }
 
+             //
 
-             if (cname == "tray" || cname == "torso" || cname == "eyes" || cname == "head")      // differences between cob 3,2 and cob 3.5/6
+             if (cname == "tray" || cname == "torso" || cname == "eyes" || cname == "head" || cname == "arm")      // differences between cob 3,2 and cob 3.5/6
              {
                 if (pname == "store" ) pname = "lowered";
                 if (pname == "deliverup" ) pname = "raised";
+
+                if (cname == "arm")
+                {
+                    pname = pname + ":" + pname1;
+                }
 
                 if (runWithROS)
                 {
@@ -1187,10 +1216,10 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
           {
              currentLikelyhood = Goalquery.value(0).toDouble();
           }
-          qDebug()<<pname<<" " <<pname1;
-          qDebug()<<currentLikelyhood;
-          currentLikelyhood += pname1.toDouble();
-          qDebug()<<currentLikelyhood;
+     //     qDebug()<<pname<<" " <<pname1;
+    //      qDebug()<<currentLikelyhood;
+          currentLikelyhood = pname1.toDouble();
+     //     qDebug()<<currentLikelyhood;
 
           Goalquery.prepare("UPDATE ActionPossibilities SET likelihood = :like where apid = :apid");
           Goalquery.bindValue(":apid",pname);
@@ -1285,6 +1314,16 @@ void MainWindow::on_stopSchedulerPushButton_clicked()
     ui->stopSchedulerPushButton->setEnabled(false);
     ui->evaluateAllPushButton->setEnabled(true);
     ui->showNonSchedcheckBox->setEnabled(true);
+
+
+    int rows = ui->sequenceTableWidget->rowCount();
+
+    for (int i= 0; i< rows; i++)
+    {
+
+       ui->sequenceTableWidget->item(i,0)->setBackgroundColor(Qt::white);
+
+    }
 
 
 }
@@ -1410,12 +1449,6 @@ void MainWindow::stopSequence(QString sequenceName)
     GUIquery.bindValue(":name",sequenceName );
 
     GUIquery.exec();
-
-    while (!terminationAllowed)
-    {
-        qDebug()<<"................Waiting on termination..............";
-        sleep(0.5);
-    }
 
     sched->terminate();
 

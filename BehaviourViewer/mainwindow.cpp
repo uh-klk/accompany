@@ -237,9 +237,13 @@ void MainWindow::fillDisplayArea(QString seq)
         {
           ui->tableWidget->setItem(row, 0, new QTableWidgetItem(query.value(5).toString()));
           ui->tableWidget->setItem(row, 2, new QTableWidgetItem(query.value(6).toString()));
+          ui->tableWidget->setItem(row, 1, new QTableWidgetItem("     "));
+          ui->tableWidget->setItem(row, 3, new QTableWidgetItem("     "));
         }
         else
         {
+          ui->tableWidget->setItem(row, 0, new QTableWidgetItem("     "));
+          ui->tableWidget->setItem(row, 2, new QTableWidgetItem("     "));
           ui->tableWidget->setItem(row, 1, new QTableWidgetItem(query.value(5).toString()));
           ui->tableWidget->setItem(row, 3, new QTableWidgetItem(query.value(7).toString()));
         }
@@ -259,4 +263,73 @@ void MainWindow::on_checkBox_toggled(bool checked)
 void MainWindow::on_checkBox_2_toggled(bool checked)
 {
        fillSequenceCombo();
+}
+
+void MainWindow::on_pushButton_clicked()
+{
+
+    QString Seq = ui->comboBox->currentText();
+
+
+    QPrinter printer;
+
+    QPrintDialog *dialog = new QPrintDialog(&printer, this);
+    dialog->setWindowTitle(tr("Print Document"));
+
+  //  if (editor->textCursor().hasSelection())
+  //      dialog->addEnabledOption(QAbstractPrintDialog::PrintSelection);
+    if (dialog->exec() != QDialog::Accepted)
+        return;
+
+    QPainter painter;
+    painter.begin(&printer);
+
+    QString text;
+
+    int rows = ui->tableWidget->rowCount();
+
+    int n = 100;
+
+    painter.drawText(100, n, 500, 500, Qt::AlignLeft|Qt::AlignTop, Seq);
+
+    n+=60;
+
+
+    for (int i =0; i<rows; i++)
+    {
+        text = ui->tableWidget->item(i,0)->text() + " "
+             + ui->tableWidget->item(i,1)->text();
+
+
+        painter.drawText(100, n, 500, 500, Qt::AlignLeft|Qt::AlignTop, text);
+
+        n+=20;
+
+     }
+
+    for (int i =0; i<4; i++)
+    {
+        text = " ";
+
+
+        painter.drawText(100, n, 500, 500, Qt::AlignLeft|Qt::AlignTop, text);
+
+        n+=20;
+
+     }
+
+    for (int i =0; i<rows; i++)
+    {
+        text = ui->tableWidget->item(i,2)->text() + " "
+             + ui->tableWidget->item(i,3)->text();
+
+        qDebug()<<text;
+        painter.drawText(100, n, 500, 500, Qt::AlignLeft|Qt::AlignTop, text);
+
+        n+=20;
+
+     }
+    painter.end();
+
+
 }

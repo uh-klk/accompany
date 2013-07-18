@@ -65,35 +65,6 @@
       <string>Doorbell</string>
      </property>
     </widget>
-    <widget class="QSpinBox" name="cupSpinBox">
-     <property name="geometry">
-      <rect>
-       <x>290</x>
-       <y>80</y>
-       <width>54</width>
-       <height>24</height>
-      </rect>
-     </property>
-     <property name="minimum">
-      <number>1</number>
-     </property>
-     <property name="maximum">
-      <number>5</number>
-     </property>
-    </widget>
-    <widget class="QLabel" name="label">
-     <property name="geometry">
-      <rect>
-       <x>220</x>
-       <y>90</y>
-       <width>71</width>
-       <height>16</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string>Cup Level</string>
-     </property>
-    </widget>
     <widget class="QCheckBox" name="sofa2CheckBox">
      <property name="geometry">
       <rect>
@@ -133,17 +104,17 @@
       <string>Tray Empty/Full  (Full if ticked) </string>
      </property>
     </widget>
-    <widget class="QLabel" name="label_2">
+    <widget class="QCheckBox" name="cupCheckBox">
      <property name="geometry">
       <rect>
-       <x>200</x>
-       <y>110</y>
-       <width>191</width>
-       <height>16</height>
+       <x>220</x>
+       <y>90</y>
+       <width>221</width>
+       <height>23</height>
       </rect>
      </property>
      <property name="text">
-      <string>(Higher value means cup is full)</string>
+      <string>Cup Empty/Full (Full if ticked)</string>
      </property>
     </widget>
    </widget>
@@ -273,7 +244,7 @@
      </rect>
     </property>
     <property name="text">
-     <string> </string>
+     <string/>
     </property>
    </widget>
   </widget>
@@ -283,7 +254,7 @@
      <x>0</x>
      <y>0</y>
      <width>509</width>
-     <height>20</height>
+     <height>22</height>
     </rect>
    </property>
   </widget>

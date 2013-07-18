@@ -1,6 +1,9 @@
 import time, os, sys
 from subprocess import Popen, PIPE
 from config import ros_config
+from threading import RLock
+
+_threadLock = RLock()
 
 class ROS(object):
     _envVars = {}    
@@ -29,11 +32,11 @@ class ROS(object):
             sub.unregister()
         
     def initROS(self, name='rosHelper'):
-        if not self._rospy.core.is_initialized():
-            self._rospy.init_node('rosHelper', anonymous=True, disable_signals=True)
+        with _threadLock:
+            if not self._rospy.core.is_initialized():
+                self._rospy.init_node('rosHelper', anonymous=True, disable_signals=True)
         
     def getSingleMessage(self, topic, dataType=None, retryOnFailure=1, timeout=None):
-        
         try:
             if dataType == None:
                 if not self._topicTypes.has_key(topic):
@@ -60,7 +63,16 @@ class ROS(object):
             else:
                 return None
     
-    def getTopics(self, baseFilter='', exactMatch=False):
+    def getParam(self, paramName):
+        try:
+            ROS.configureROS(packageName='rospy')
+            import rospy
+            return rospy.get_param(paramName)
+        except Exception as e:
+            print >> sys.stderr, "Unable to connect to ros parameter server, Error: %s" % e
+            return []
+    
+    def getTopics(self, baseFilter='', exactMatch=False, retry=10):
         # topics = self._rospy.get_published_topics(baseFilter)
         # if len(topics) == 0 and baseFilter.strip('/').find('/') == -1:
         
@@ -73,7 +85,16 @@ class ROS(object):
         # but head_controller/state does not
         # in this case, get all of them and loop through
         topics = []
-        allTopics = self._rospy.get_published_topics()
+        with _threadLock:
+            try:
+                allTopics = self._rospy.get_published_topics()
+            except Exception as e:
+                print "Error while retrieving topics, will retry %s more times." % retry
+                if(retry > 0):
+                    return self.getTopics(baseFilter, exactMatch, retry - 1)
+                else:
+                    return topics
+        
         if baseFilter.startswith('/'):
             baseFilter = baseFilter[1:]
         for t in allTopics:
@@ -124,8 +145,9 @@ class ROS(object):
                         diffEnv[key] = value.replace(baseEnv[key], '').strip(':')
         
                 # Add in any overrides from the config file
-                diffEnv.update(ros_config['envVars'])
-                rosEnv.update(ros_config['envVars'])
+                if ros_config.has_key('envVars'):
+                    diffEnv.update(ros_config['envVars'])
+                    rosEnv.update(ros_config['envVars'])
 
             ROS._envVars[version] = (diffEnv, rosEnv)
 
@@ -149,9 +171,6 @@ class ROS(object):
         overlayPath = overlayPath or ros_config['overlayPath']
         if(rosMaster == None and ros_config.has_key('rosMaster')):
             rosMaster = ros_config['rosMaster']
-        else:
-            #TODO: error handling
-            pass
 
         for k, v in ROS.parseRosBash(version).items():
             if k == 'PYTHONPATH' and sys.path.count(v) == 0:
@@ -222,7 +241,8 @@ class RosSubscriber(object):
     def _touch(self):
         self._lastAccess = time.time()
         if self._subscriber == None:
-            self._subscriber = self._rospy.Subscriber(self._topic, self._dataType, self._callback)
+            with _threadLock:
+                self._subscriber = self._rospy.Subscriber(self._topic, self._dataType, self._callback)
     
     def unregister(self):
         if self._subscriber != None:
@@ -236,7 +256,7 @@ class RosSubscriber(object):
             self.unregister()
 
 class Transform(object):
-    def __init__(self, rosHelper=None):
+    def __init__(self, rosHelper=None, fromTopic=None, toTopic=None):
         if(rosHelper == None):
             self._ros = ROS()
         else:
@@ -247,29 +267,37 @@ class Transform(object):
         self._tf = tf
         self._ros.initROS()
         self._listener = None
+        self._defaultFrom = fromTopic
+        self._defaultTo = toTopic
     
-    def getRobotPose(self, mapTopic='/map', baseTopic='/base_footprint'):
+    def getTransform(self, fromTopic=None, toTopic=None):
+        if fromTopic == None:
+            fromTopic = self._defaultFrom
+        if toTopic == None:
+            toTopic = self._defaultTo
+        
         """
-        Waits for the /base_footprint to /map transform to be availalble and 
+        Waits for the /fromTopic to /toTopic transform to be availalble and 
         returns two tuples: (x, y, z) and a quaternion ( rx, ry, rz, rxy)
         Note: z values are 0 for 2D mapping and navigation.
         """
-        if len(self._ros.getTopics('base_pose')) == 0:
+        if len(self._ros.getTopics('base_pose', exactMatch=True)) == 0:
             # this should work for all navigation systems, but at a performance cost
             if self._listener == None:
                 self._listener = self._tf.TransformListener()
 
             # Wait for tf to get the frames
-            now = self._rospy.Time(0)
-            try:
-                self._listener.waitForTransform(mapTopic, baseTopic, now, self._rospy.Duration(1.0))
-            except self._tf.Exception as e:
-                #if str(e) != 'Unable to lookup transform, cache is empty, when looking up transform from frame [' + baseTopic + '] to frame [' + mapTopic + ']':
-                print >> sys.stderr, "Error while waiting for transform: " + str(e)
-                return ((None, None, None), None)
+            with _threadLock:
+                now = self._rospy.Time(0)
+                try:
+                    self._listener.waitForTransform(toTopic, fromTopic, now, self._rospy.Duration(1.0))
+                except self._tf.Exception as e:
+                    # if str(e) != 'Unable to lookup transform, cache is empty, when looking up transform from frame [' + baseTopic + '] to frame [' + mapTopic + ']':
+                    print >> sys.stderr, "Error while waiting for transform: " + str(e)
+                    return ((None, None, None), None)
             
             try:
-                (xyPos, heading) = self._listener.lookupTransform(mapTopic, baseTopic, now)
+                (xyPos, heading) = self._listener.lookupTransform(toTopic, fromTopic, now)
                 (_, _, orientation) = self._tf.transformations.euler_from_quaternion(heading)
                 return (xyPos, orientation)
             except (self._tf.LookupException, self._tf.ConnectivityException, self._tf.ExtrapolationException) as e:
@@ -277,7 +305,11 @@ class Transform(object):
                 return ((None, None, None), None)
         else:
             # this takes significantly less processing time, but requires ipa_navigation    
-            pose = self._ros.getSingleMessage('/base_pose').pose
+            poseMsg = self._ros.getSingleMessage('/base_pose')
+            if poseMsg == None:
+                print >> sys.stderr, "No message recieved from /base_pose"
+                return ((None, None, None), None)
+            pose = poseMsg.pose
             xyPos = (pose.position.x, pose.position.y, pose.position.z)
             (_, _, orientation) = self._tf.transformations.euler_from_quaternion((pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w))
             return (xyPos, orientation)

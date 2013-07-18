@@ -2,7 +2,6 @@ import datetime
 from Data.dataAccess import DataAccess
 from threading import Thread
 from extensions import PollingThread, PollingProcessor
-from Robots.careobot import CareOBot
 
 class ActionHistory(object):
     _defaultImageType = 'png'
@@ -33,7 +32,8 @@ class ActionHistory(object):
 
     def addHistory(self, ruleName, imageBytes=None, imageType=None):
         
-        cob = CareOBot()
+        from Robots.robotFactory import Factory
+        cob = Factory.getCurrentRobot()
         dao = DataAccess()
         dateNow = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         location = dao.getRobotByName(cob.name)['locationId']
@@ -72,64 +72,45 @@ class SensorLog(PollingProcessor):
                 
     def start(self):
         if self._name != '':
-            print "Started polling sensor changes for %s" % (self._name)
+            print "Started updating database for %s sensor changes" % (self._name)
         else:
-            print "Started polling sensor changes"
-        self._addPollingProcessor('sensorHistory', self.checkUpdateSensors, (self._channels, ), 0.01)
+            print "Started updating database for [unknown] sensor changes"
+        self._addPollingProcessor('sensorHistory', self.checkUpdateSensors, (self._channels,), 0.01)
 
     def stop(self):
         if self._name != '':
-            print "Stopped polling sensor changes for %s" % (self._name)
+            print "Stopped updating database for %s sensor changes" % (self._name)
         else:
-            print "Stopped polling sensor changes"
+            print "Stopped updating database for [unknown] sensor changes"
 
         self._removePollingProcessor('sensorHistory')
 
     def checkUpdateSensors(self, channels):
-        for k in channels.keys():
-            if not self._logCache.has_key(k):
-                current = self._dao.getSensor(channels[k]['id'])
-                self._logCache.setdefault(k, { 'value': current['value'], 'status': current['status']})
-            if self._logCache[k]['status'] != channels[k]['status']:
+        for uuid, sensor in channels.items():
+            if not self._logCache.has_key(uuid):
+                current = self._dao.getSensor(sensor['id'])
+                self._logCache[uuid] = { 'value': current['value'], 'status': current['status']}
+
+            status = str(sensor['status']).capitalize()
+            if self._logCache[uuid]['status'] != status or self._logCache[uuid]['value'] != sensor['value']:
                 timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 success = self._dao.saveSensorLog(
-                                                  channels[k]['id'], 
-                                                  channels[k]['value'], 
-                                                  channels[k]['status'],
+                                                  sensor['id'],
+                                                  sensor['value'],
+                                                  status,
                                                   timestamp,
-                                                  channels[k]['room'],
-                                                  channels[k]['channel'])
+                                                  sensor['room'],
+                                                  sensor['channel'])
                 if success:
-                    print "Updated sensor log for %(id)s to %(status)s" % { 
-                                                                           'id':channels[k]['channel'], 
-                                                                           'status': channels[k]['status']
+                    print "Updated sensor log for %(id)s to %(status)s (%(value)s)" % { 
+                                                                           'id':sensor['channel'],
+                                                                           'status': status,
+                                                                           'value': sensor['value'],
                                                                            }
-                    self._logCache[k]['value'] = channels[k]['value']
-                    self._logCache[k]['status'] = channels[k]['status']
-        
+                    self._logCache[uuid]['value'] = sensor['value']
+                    self._logCache[uuid]['status'] = status
 
 if __name__ == '__main__':
     import sys
-    import config
-    import sensors
-    z = sensors.ZigBee(config.server_config['udp_listen_port'])
-    g = sensors.GEOSystem(config.server_config['mysql_geo_server'],
-                            config.server_config['mysql_geo_user'],
-                            config.server_config['mysql_geo_password'],
-                            config.server_config['mysql_geo_db'],
-                            config.server_config['mysql_geo_query'])
-    sz = SensorLog(z.channels)
-    sg = SensorLog(g.channels)
-    z.start()
-    g.start()
-    sz.start()
-    sg.start()
-    while True:
-        try:
-            sys.stdin.read()
-        except KeyboardInterrupt:
-            break
-    sz.stop()
-    sg.stop()
-    g.stop()
-    z.stop()
+    print >> sys.stderr, "Sensor update code has moved to sensor.py"
+    print >> sys.stderr, "Run 'python sensors.py' to begin monitoring sensors"

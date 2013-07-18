@@ -1,285 +1,99 @@
-import io, math, time, sys
-from PIL import Image
-from extensions import PollingProcessor
-from Data.dataAccess import Sensors
-import Data.dataAccess
+import math, sys
+import robot
 import rosHelper
+from config import robot_config
 from exceptions import StopIteration
+from collections import deque
 
-class PoseUpdater(PollingProcessor):
-    def __init__(self, robot=None):
-        super(PoseUpdater, self).__init__()
-        if robot == None:
-            robot = CareOBot()
-        self._robot = robot
-        self._ros = rosHelper.ROS()
-        self._sensors = Sensors().findSensors()
-        self._channels = {}
-        self._warned = []
-    
-    def start(self):
-        print "Started polling pose for %s" % (self._robot.name)
-        self._addPollingProcessor('pose ' + self._robot.name, self.checkUpdatePose, (self._robot, ), .25)
-    
-    def stop(self):        
-        print "Stopped polling location for %s" % (self._robot.name)
-        self._removePollingProcessor('pose ' + self._robot.name)
-    
-    @property
-    def robot(self):
-        return self._robot
-    
-    @property
-    def channels(self):
-        if self._channels == None:
-            self._channels = {}
-        
-        return self._channels
-    
-    def checkUpdatePose(self, robot):
-        self.updateTray(robot)
-
-    def updateTray(self, robot):
-        (name, _) = robot.getComponentState('tray')
-
-        trayIsRaised = None
-        trayIsLowered = None
-        trayIsEmpty = None
-        if name == 'up':
-            trayIsRaised = 'up'
-        else:
-            trayIsRaised = ''
-            
-        if name == 'down':
-            trayIsLowered = 'down'
-        else:
-            trayIsLowered = ''
-            
-        range0 = self._ros.getSingleMessage(topic='/range_0', timeout=0.25)
-        range1 = self._ros.getSingleMessage(topic='/range_0', timeout=0.25)
-        range2 = self._ros.getSingleMessage(topic='/range_0', timeout=0.25)
-        range3 = self._ros.getSingleMessage(topic='/range_0', timeout=0.25)
-        if range0 != None and range1 != None and range2 != None and range3 != None:
-            threshold = 0.2
-            if range0.range < threshold or range1.range < threshold or range2.range < threshold or range3.range < threshold:
-                trayIsEmpty = 'full'
-                
-            else:
-                trayIsEmpty = 'empty'
-        else:
-            trayIsEmpty = None
-            print "Phidget sensors not ready before timeout"
-
-        _states = {
-                   'trayIsRaised': (trayIsRaised == 'up', trayIsRaised),
-                   'trayIsLowered': (trayIsLowered == 'down', trayIsLowered),
-                   'trayIsEmpty': (trayIsEmpty == 'empty', trayIsEmpty) }
-
-        for key, value in _states.items():
-            if value[1] != None:
-                try:                           
-                    sensor = next(s for s in self._sensors if s['ChannelDescriptor'] == "%s:%s" % (self._robot.name, key))
-                except StopIteration:
-                    if key not in self._warned:
-                        print >> sys.stderr, "Warning: Unable to locate sensor record for %s sensor %s." % (self._robot.name, key)
-                        self._warned.append(key)
-                    continue
-                
-                _id = sensor['sensorId']
-                self._channels[key] = {
-                                         'id': _id,
-                                         'room': self._robot.name,
-                                         'channel': key,
-                                         'value': value[0],
-                                         'status': value[1] }
-
-class CareOBot(object):
+class CareOBot(robot.Robot):
     _imageFormats = ['BMP', 'EPS', 'GIF', 'IM', 'JPEG', 'PCD', 'PCX', 'PDF', 'PNG', 'PPM', 'TIFF', 'XBM', 'XPM']
 
-    def __init__(self, name='Care-O-Bot 3.2'):
-        self._rs = None
-        self._ss = None
-        self._poseProcessor = None
-        self._name = name
-        
-    @property
-    def name(self):
-        return self._name
-    
-    @property
-    def _pose(self):
-        if self._poseProcessor == None:
-            self._poseProcessor = rosHelper.Transform()
-        return self._poseProcessor
-    
-    @property
-    def _ros(self):
-        if self._rs == None:
-            #Wait to configure/initROS ROS till it's actually needed
-            self._rs = rosHelper.ROS()
-        return self._rs
-            
-    @property
-    def _cob(self):
-        if self._ss == None:
-            #Wait to configure/initROS ROS till it's actually needed
-            self._ss = ActionLib()
-            #self._ss = ScriptServer()
-        return self._ss
-    
-    def getImage(self, leftRight='right', retFormat='PNG'):
-        topic = '/stereo/%(camera)s/image_color/compressed' % { 'camera' : leftRight }
-
-        img_msg = self._ros.getSingleMessage(topic)
-        if img_msg == None:
-            return None
-        
-        imgBytes = io.BytesIO()
-        imgBytes.write(img_msg.data)
-        
-        angle = self.getCameraAngle()
-
-        imgBytes.seek(0)
-        img = Image.open(imgBytes)
-            
-        #0=back, 180=front, 270=top, 90=bottom.  rotate if not front (0-180 are invalid angles, only included for 'buffer')
-        if angle >= 90 and angle <= 270:
-            img = img.rotate(180)
-        else:
-            pass
-        
-        retFormat = retFormat.upper()
-        if retFormat == 'JPG':
-            retFormat = 'JPEG'
-            
-        if retFormat not in CareOBot._imageFormats:
-            retFormat = 'PNG' 
-        
-        imgBytes.seek(0)
-        img.save(imgBytes, retFormat)
-
-        return imgBytes.getvalue()
-
+    def __init__(self, name, rosMaster):
+        rosHelper.ROS.configureROS(rosMaster=rosMaster)
+        super(CareOBot, self).__init__(name, ActionLib, 'script_server', robot_config[name]['head']['camera']['topic'])
+        # super(CareOBot, self).__init__(name, ScriptServer, 'script_server', '/stereo/right/image_color/compressed')
+               
     def getCameraAngle(self):
-        cameraState = self.getComponentState('head', True)
+        state = self.getComponentState('head', True)
+        if state == None:
+            return None
+        else:
+            (_, cameraState) = state
         
-        angle = round(math.degrees(cameraState.actual.positions[0]), 2)
+        pos = cameraState['positions'][0]
+        angle = round(math.degrees(pos), 2)
         angle = angle % 360
             
         return angle
         
-    def executeFunction(self, funcName, kwargs):
-        return self._cob.runFunction(funcName, kwargs)
-    
-    def getLocation(self, raw=False):
-        p = self._pose
-        ((x, y, _), rxy) = p.getRobotPose()
-        if x == None or y == None:
-            if raw:
-                return (None, None, None)
-            else:
-                return (None, (None, None, None))
-        
-        angle = round(math.degrees(rxy))
-        pos = (round(x, 3), round(y, 3), angle)
-        
-        if raw:
-            return pos
-        else:
-            return Data.dataAccess.Locations.resolveLocation(pos)
-
-    def setLight(self, colour):
-        self._cob.runFunction('set_light', {'parameter_name': colour})
-
-    def setComponentState(self, name, value):
-        #check if the component has been initialised, and init if it hasn't
+    def setComponentState(self, name, value, blocking=True):
+        # check if the component has been initialised, and init if it hasn't
         if len(self._ros.getTopics('/%(name)s_controller' % { 'name': name })) == 0:
-            self._cob.initComponent(name)
-        status = self._cob.runComponent(name, value)
-        #There is a bug in the Gazebo COB interface that prevents proper trajectory tracking
-        #this causes most status messages to come back as aborted while the operation is still
-        #commencing, time delay to attempt to compensate...
-        if status != 3 and len(self._ros.getTopics('/gazebo')) > 0:
-            time.sleep(5)
-            print >> sys.stderr, 'Gazebo hack: state ' + self._rs._states[status] + ' changed to state ' + self._rs._states[3]
-            return self._rs._states[3]
+            self._robInt.initComponent(name)
         
-        return self._rs._states[status]
+        #Special handling of the unload_tray moveit code value='trayToTable:height'
+        if name == 'arm' and str(value).startswith('trayToTable'):
+            return self.unloadTray(str(value).split(':')[1], blocking)
         
-    def getComponentPositions(self, componentName):
-        try:
-            self._ros.configureROS(packageName='rospy')
-            import rospy
-            return rospy.get_param('script_server/%s' % (componentName))
-        except:
-            return []
-
-    def getComponents(self):
-        try:
-            self._ros.configureROS(packageName='rospy')
-            import rospy
-            return rospy.get_param('script_server').keys()
-        except:
-            return []
-        
-    def getComponentState(self, componentName, raw=False):
-        topic = '/%(name)s_controller/state' % { 'name': componentName }
-        state = self._ros.getSingleMessage(topic)
-        
-        if raw:
-            return state
-        else:
-            return self.resolveComponentState(componentName, state)
+        return super(CareOBot, self).setComponentState(name, value, blocking)
     
-    def resolveComponentState(self, componentName, state, tolerance=0.10):
-        if state == None:
-            return (None, None)
+    def play(self, fileName, blocking=True):
+        self.executeFunction("play", {
+                                      'parameter_name':fileName,
+                                      'blocking':blocking
+                                      })
+    
+    def say(self, text, languageCode="en-gb", blocking=True):
+        self.executeFunction("say", {
+                                     'parameter_name': [text,],
+                                     'blocking': blocking })
         
-        curPos = state.actual.positions
+    def sleep(self, milliseconds):
+        self.executeFunction("sleep", {'duration': milliseconds / 1000.0 })
+        
+    def unloadTray(self, height, blocking):
 
-        positions = self.getComponentPositions(componentName)
-
-        if len(positions) == 0:
-            return ('', curPos)
-
-        name = None
-        diff = None
-        for positionName in positions:
-            positionValue = self.getValue(positions[positionName])
-            if type(positionValue) is not list:
-                #we don't currently handle nested types
-                continue
-
-            if len(positionValue) != len(curPos):
-                #raise Exception("Arguement lengths don't match")
-                continue
+        try:
+            h = float(height)
+        except Exception as e:
+            print >> sys.stderr, "Unable to cast height to float, received height: %s" % height
             
-            dist = 0
-            for index in range(len(positionValue)):
-                dist += math.pow(curPos[index] - positionValue[index], 2)
-            dist = math.sqrt(dist)
-            if name == None or dist < diff:
-                name = positionName
-                diff = dist
-                        
-        if diff <= tolerance:
-            return (name, curPos)
-        else:
-            return ('', curPos)
-    
-    def getValue(self, val):
-        if type(val) is list:
-            ret = val[0]
-        else:
-            ret = val
+        try:
+            client = UnloadTrayClient()
+        except Exception as e:
+            print >> sys.stderr, "Unable to initialise UnloadTrayClient. Error: %s" % repr(e)
+            return self._ros._states[4]
         
-        return ret
-
+        return client.unloadTray(h, blocking)
+        
+class UnloadTrayClient(object):
+    
+    def __init__(self):
+        self._ros = rosHelper.ROS()
+        self._ros.configureROS(packageName='accompany_user_tests_year2')
+        import actionlib, accompany_user_tests_year2.msg
+        self._ssMsgs = accompany_user_tests_year2.msg
+        
+        self._ros.initROS()
+        self._client = actionlib.SimpleActionClient('/unload_tray', self._ssMsgs.UnloadTrayAction)
+        print "Waiting for unload_tray"
+        self._client.wait_for_server()
+        print "Connected to unload_tray"
+        
+    def unloadTray(self, height, blocking):
+        goal = self._ssMsgs.UnloadTrayGoal()
+        goal.table_height = height
+        
+        if blocking:
+            return self._client.send_goal_and_wait(goal)
+        else:
+            return self._client.send_goal(goal)
+    
 class ScriptServer(object):
 
     def __init__(self):
         self._ros = rosHelper.ROS()
-        self._ros.configureROS(packageName='simple_script_server')
+        self._ros.configureROS(packageName='cob_script_server')
         import simple_script_server
         self._ros.initROS()
         self._ss = simple_script_server.simple_script_server()
@@ -303,7 +117,6 @@ class ScriptServer(object):
             return self._ss.say(value, blocking).get_state()
         else:
             return self._ss.move(name, value, blocking, mode).get_state()
-       
 
 class ActionLib(object):
     _specialCases = {
@@ -319,13 +132,15 @@ class ActionLib(object):
         
         self._ros.initROS()
         self._client = actionlib.SimpleActionClient('/script_server', self._ssMsgs.ScriptAction)
+        print "Waiting for script_server"
         self._client.wait_for_server()
+        print "Connected to script_server"
         
     def runFunction(self, funcName, kwargs):
         name = None
         value = None
         mode = None
-        blocking = None
+        blocking = True
         service_name = None
         duration = None
         
@@ -352,20 +167,22 @@ class ActionLib(object):
                           component_name=name,
                           parameter_name=value,
                           mode=mode,
-                          blocking=blocking,
+                          # blocking=blocking,
                           service_name=service_name,
                           duration=duration
                           )
         
-        return self._client.send_goal_and_wait(goal)
+        if blocking:
+            return self._client.send_goal_and_wait(goal)
+        else:
+            return self._client.send_goal(goal)
         
     def initComponent(self, name):
         if name not in ActionLib._specialCases.keys():
             func = 'init'
             goal = self._ssMsgs.ScriptGoal(
                               function_name=func.encode('ascii', 'ignore'),
-                              component_name=name.encode('ascii', 'ignore'),
-                              blocking=True)
+                              component_name=name.encode('ascii', 'ignore'))
             return self._client.send_goal_and_wait(goal)
         return 3
     
@@ -381,31 +198,126 @@ class ActionLib(object):
                           component_name=str(name).encode('ascii', 'ignore'),
                           parameter_name=str(value).encode('ascii', 'ignore'),
                           mode=str(mode).encode('ascii', 'ignore'),
-                          blocking=bool(blocking)
+                          # blocking=bool(blocking)
                           )
         
-        status = self._client.send_goal_and_wait(goal)
+        if(blocking):
+            status = self._client.send_goal_and_wait(goal)
+        else:
+            self._client.send_goal(goal)
+            status = 1
+            
         return status
 
-if __name__ == '__main__':
-    robot = CareOBot()
-    """
-    frequency=math.pi*2/100
-    phase1=2
-    phase2=0
-    phase3=4
-    center=128
-    width=127
-    l=50
-    robot = CareOBot()
-    while True:
-        for i in range(0, l):
-            red = (math.sin(frequency*i + phase1) * width + center) / 255
-            grn = (math.sin(frequency*i + phase2) * width + center) / 255
-            blu = (math.sin(frequency*i + phase3) * width + center) / 255
-            robot.setLight([red, grn, blu])
+class PoseUpdater(robot.PoseUpdater):
+    def __init__(self, robot):
+        super(PoseUpdater, self).__init__(robot)
+        self._rangeSensors = robot_config[robot.name]['phidgets']['topics']
+        self._rangeThreshold = robot_config[robot.name]['tray']['size'] / 100.0
+        self._rangeWindow = robot_config[robot.name]['phidgets']['windowSize']
+        self._rangeHistory = {}
+    
+    def checkUpdatePose(self, robot):
+        states = {}
+        states.update(self.getTrayStates(robot))
+        states.update(self.getHeadStates(robot))
+        self.updateStates(states)
+        
+    def updateStates(self, states):
+        for key, value in states.items():
+            if value != None and value[1] != None:
+                try:
+                    # sensor = next(s for s in self._sensors if s['ChannelDescriptor'] == "%s:%s" % (self._robot.name, key))
+                    sensor = next(s for s in self._sensors if s['name'] == "%s" % (key))
+                    if key in self._warned:
+                        self._warned.remove(key)
+                except StopIteration:
+                    if key not in self._warned:
+                        print >> sys.stderr, "Warning: Unable to locate sensor record for %s sensor %s." % (self._robot.name, key)
+                        self._warned.append(key)
+                    continue
+                
+                _id = sensor['sensorId']
+                self._channels[key] = {
+                                         'id': _id,
+                                         'room': self._robot.name,
+                                         'channel': key,
+                                         'value': value[0],
+                                         'status': value[1] }
+        
+    def getHeadStates(self, robot):
+        return {
+                   'eyePosition': self.getComponentPosition(robot, 'head'),
+                   }
+    
+    def getPhidgetState(self):        
+        trayIsEmpty = None                
+        
+        averages = []
+        for topic in self._rangeSensors:
+            if not self._rangeHistory.has_key(topic):
+                self._rangeHistory[topic] = deque()
+            
+            rangeMsg = self._ros.getSingleMessage(topic=topic, timeout=0.25)
+            if rangeMsg == None:
+                if topic not in self._warned: 
+                    self._warned.append(topic)
+                    print "Phidget sensor not ready before timeout for topic: %s" % topic
+                
+                return (None, None)
+            else:
+                if topic in self._warned:
+                    self._warned.remove(topic)
 
-    """
+            self._rangeHistory[topic].append(rangeMsg.range)
+            if len(self._rangeHistory[topic]) > self._rangeWindow:
+                self._rangeHistory[topic].popleft()
+            
+            averages.append(sum(self._rangeHistory[topic]) / len(self._rangeHistory[topic]))
+        
+        if any(map(lambda x: x <= self._rangeThreshold, averages)):
+            trayIsEmpty = 'Full'
+        else:
+            trayIsEmpty = 'Empty'
+   
+        return (trayIsEmpty, trayIsEmpty)
+
+    def getComponentPosition(self, robot, componentName):
+        (state, _) = robot.getComponentState(componentName)
+        if state == None or state == '':
+            print "No component state for: %s" % componentName
+            state = 'Unknown'
+        
+        return (state, state)
+
+    def getTrayStates(self, robot):
+        return {
+                   'trayStatus': self.getComponentPosition(robot, 'tray'),
+                   'trayIs': self.getPhidgetState() }
+
+if __name__ == '__main__':
+    from robotFactory import Factory
+    robot = Factory.getCurrentRobot()
+    print robot.setComponentState('arm', 'trayToTable:0.45')                
+"""
+if __name__ == '__main__':
+    from robotFactory import Factory
+    robot = Factory.getCurrentRobot()
+#     frequency=math.pi*2/100
+#     phase1=2
+#     phase2=0
+#     phase3=4
+#     center=128
+#     width=127
+#     l=50
+#     robot = CareOBot('Care-O-Bot 3.2', 'http://cob3-2-pc1:11311')
+#     while True:
+#         for i in range(0, l):
+#             red = (math.sin(frequency*i + phase1) * width + center) / 255
+#             grn = (math.sin(frequency*i + phase2) * width + center) / 255
+#             blu = (math.sin(frequency*i + phase3) * width + center) / 255
+#             robot.setLight([red, grn, blu])
+
     import locations
     from history import SensorLog
     l = locations.RobotLocationProcessor(robot)
@@ -426,4 +338,4 @@ if __name__ == '__main__':
 
     sr.stop()
     rp.stop()
-    
+"""
