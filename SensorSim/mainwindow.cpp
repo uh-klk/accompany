@@ -12,8 +12,8 @@
 #include <QStringListModel>
 #include <QStringList>
 #include <QStandardItemModel>
-#include <phonon/audiooutput.h>
-#include <phonon/mediaobject.h>
+//#include <phonon/audiooutput.h>
+//#include <phonon/mediaobject.h>
 
 #include <QSqlRelationalTableModel>
 QSqlDatabase db;
@@ -514,9 +514,9 @@ void MainWindow::on_pushButton_clicked()
 
     updateSensorLog(302, 1, "On");
 
-    Phonon::MediaObject *music = createPlayer(Phonon::MusicCategory,
-                                                  Phonon::MediaSource("doorbell-1.wav"));
-    music->play();
+    //Phonon::MediaObject *music = createPlayer(Phonon::MusicCategory,
+    //                                              Phonon::MediaSource("doorbell-1.wav"));
+    //music->play();
 
     updateSensorLog(302, 0, "Off");
 }
