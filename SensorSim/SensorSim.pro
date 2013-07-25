@@ -5,8 +5,6 @@
 #-------------------------------------------------
 
 QT       += sql
-QT+=phonon
-
 
 TARGET = SensorSim
 TEMPLATE = app
