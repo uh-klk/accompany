@@ -27,6 +27,7 @@ public:
 	void runSequence(QString sequenceName, int priority, QString CanInterrupt, int row);
 	void checkExecutionResult();
 	bool closeDownRequest;
+	bool stopExecution;
 	void COB_component(QString component, QString action);
 	bool openDatabase(QString dbName, QString host, QString user, QString pw, QSqlDatabase& db);
 	bool openAllDatabaseConnections(QString host, QString user, QString pw);
@@ -40,13 +41,11 @@ protected:
 
 private:
 	Ui::MainWindow *ui;
-
 	QTimer timer;
-
 	QTimer schedTimer;
+	void checkStopExecution();
 
 private slots:
-
 	void on_executePushButton_clicked();
 	void on_evaluateAllPushButton_clicked();
 	void on_sequenceTableWidget_cellClicked(int row, int column);

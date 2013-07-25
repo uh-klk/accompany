@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
+#include <exception>
 
 #include <QSqlRelationalTableModel>
 #include <QDebug>
@@ -18,25 +19,6 @@
 
 using namespace std;
 
-/*
- be sure to link in python during compilation ('-lpython2.6' for gcc linker)
- */
-
-template<typename T>
-std::string vectorPrint(vector<T> v) {
-	int size = v.size();
-	std::stringstream ret;
-	ret << "[";
-	for (int i = 0; i < size; i++) {
-		ret << v.at(i);
-		if (i != size - 1) {
-			ret << ",";
-		}
-	}
-	ret << "]";
-	return ret.str();
-}
-
 #define NO_PROBLEMS 0
 #define ACTIONRULES_DB_ERROR_SELECT 1
 #define ACTIONRULES_DB_ERROR_UPDATE 2
@@ -46,15 +28,22 @@ std::string vectorPrint(vector<T> v) {
 #define ACTIONGOALS_DB_ERROR_UPDATE 6
 #define SCRIPTSERVER_EXECUTION_FAILURE 7
 
+std::string modulePath = "../UHCore/Core";
+
 class schedulerThread: public QThread {
 protected:
 	void run();
-
 };
 
-QSqlDatabase db0, db1, db2, db3, db4, db5, db6, db7;     // a number of seprate connections to avoid conflicts
-bool dbOpen;
+class threadInterruptedException: public exception {
+	virtual const char* what() const throw () {
+		return "Thread interrupted.";
+	}
+};
 
+QSqlDatabase db0, db1, db2, db3, db4, db5, db6, db7;     // a number of separate connections to avoid conflicts
+
+bool dbOpen;
 int logTableRow;
 
 Ui::MainWindow *uiLink;
@@ -88,7 +77,12 @@ int indent;  // controls indentation on debug display only
 
 void schedulerThread::run() {
 	qDebug() << "          Thread starting.... " << currentlyExecutingSequence;
-	executionResult = mainW->executeSequence(currentlyExecutingSequence, false);
+	mainW->stopExecution = false;
+	try {
+		executionResult = mainW->executeSequence(currentlyExecutingSequence, false);
+	} catch (threadInterruptedException& e) {
+	}
+
 	qDebug() << "          Thread ending.... " << currentlyExecutingSequence;
 	qDebug() << "";
 	uiLink->sequenceTableWidget->item(currentlyExecutingRow, 1)->setBackgroundColor(Qt::white);
@@ -100,7 +94,6 @@ void schedulerThread::run() {
 }
 
 schedulerThread* sched;
-
 Robot *robot;
 
 MainWindow::MainWindow(int argc, char** argv, QWidget *parent) :
@@ -191,9 +184,7 @@ MainWindow::MainWindow(int argc, char** argv, QWidget *parent) :
 	// Get the apartment/house location
 
 	QSqlQuery query(db0);
-
 	query.prepare("SELECT ExperimentalLocationId FROM SessionControl where sessionId = 1");
-
 	query.exec();
 
 	if (query.next()) {
@@ -201,7 +192,6 @@ MainWindow::MainWindow(int argc, char** argv, QWidget *parent) :
 	} else {
 		QMessageBox msgBox;
 		msgBox.setIcon(QMessageBox::Critical);
-
 		msgBox.setText("Cannot read session control table from database!");
 		msgBox.exec();
 		closeDownRequest = true;
@@ -228,10 +218,9 @@ MainWindow::MainWindow(int argc, char** argv, QWidget *parent) :
 	sched = new schedulerThread;
 
 	connect(&timer, SIGNAL(timeout()), this, SLOT(doSchedulerWork()));  // this is for the arbitration loop
+	connect(&schedTimer, SIGNAL(timeout()), this, SLOT(updateTime()));  // this updates the time displays on the screen
 
-	connect(&schedTimer, SIGNAL(timeout()), this, SLOT(updateTime()));  // this updates the time displayes on the screen
-
-	schedTimer.start(5000);   // every 5 seconds refersh the time shown on the screen
+	schedTimer.start(5000);   // every 5 seconds refresh the time shown on the screen
 
 	debugEnabled = false;
 
@@ -239,10 +228,19 @@ MainWindow::MainWindow(int argc, char** argv, QWidget *parent) :
 
 	indent = 0;
 
-	// open up the python interface to the robot
 	if (runWithROS) {
-		std::string modulePath = "../UHCore/Core";
+		// open up the python interface to the robot
 		robot = new Robot(modulePath); //use the current robot specified in the sessioncontrol table
+		if (robot->getName() == "") {
+			// This appears to happen sometimes if the application has not completely loaded? before reaching this line
+			// nothing we can do, so panic and exit
+			QMessageBox msgBox;
+			msgBox.setIcon(QMessageBox::Critical);
+			msgBox.setText("Robot interface did not build!  This seems to be related to clicking through the dialogs too quickly.");
+			msgBox.exec();
+			closeDownRequest = true;
+			return;
+		}
 	}
 }
 
@@ -268,9 +266,7 @@ void MainWindow::updateTime() {
 	QSqlQuery query(db0);
 
 	query.clear();
-
 	query.prepare("SELECT time(NOW())");
-
 	query.exec();
 
 	while (query.next()) {
@@ -278,9 +274,7 @@ void MainWindow::updateTime() {
 	}
 
 	query.clear();
-
 	//   query.prepare("CALL getSchedulerTime()");
-
 	query.exec("CALL spGetSchedulerTime()");
 
 	while (query.next()) {
@@ -401,9 +395,7 @@ void MainWindow::on_sequenceTableWidget_cellDoubleClicked(int row, int column) {
 
 void MainWindow::on_sequenceTableWidget_cellClicked(int row, int column) {
 	QString sequenceName = ui->sequenceTableWidget->item(row, 0)->text();
-
 	QSqlQuery query(db2);
-
 	QString qry =
 			"SELECT \
                   CASE ruleType WHEN \"R\" THEN \"Rule\" WHEN \"A\" THEN \"    Action\" END,\
@@ -430,7 +422,6 @@ void MainWindow::on_sequenceTableWidget_cellClicked(int row, int column) {
 
 	ui->SQLtableWidget->clear();
 	ui->SQLtableWidget->verticalHeader()->setVisible(false);
-
 	ui->SQLtableWidget->setColumnCount(6);
 	ui->SQLtableWidget->setRowCount(query.size());
 
@@ -440,35 +431,33 @@ void MainWindow::on_sequenceTableWidget_cellClicked(int row, int column) {
 
 	int nrow = 0;
 	while (query.next()) {
-
 		ui->SQLtableWidget->setItem(nrow, 0, new QTableWidgetItem(sequenceName));
-
 		ui->SQLtableWidget->setItem(nrow, 1, new QTableWidgetItem(query.value(0).toString()));
 
 		QTableWidgetItem *item = new QTableWidgetItem();
 		item->setTextAlignment(Qt::AlignCenter);
 		item->setText(query.value(1).toString());
 		ui->SQLtableWidget->setItem(nrow, 2, item);
-
 		ui->SQLtableWidget->setItem(nrow, 3, new QTableWidgetItem(query.value(2).toString()));
 		ui->SQLtableWidget->setItem(nrow, 4, new QTableWidgetItem(query.value(3).toString()));
-		//    qDebug()<<query.value(0).toString();
+//    qDebug()<<query.value(0).toString();
+
 		if (query.value(0).toString() == "Rule") {
 			ui->SQLtableWidget->setItem(nrow, 4, new QTableWidgetItem(query.value(3).toString()));
 			ui->SQLtableWidget->item(nrow, 1)->setBackgroundColor(Qt::gray);
-
 		} else {
 			ui->SQLtableWidget->setItem(nrow, 4, new QTableWidgetItem(""));
 			ui->SQLtableWidget->item(nrow, 1)->setBackgroundColor(Qt::lightGray);
 		}
 
 		ui->SQLtableWidget->setItem(nrow, 5, new QTableWidgetItem(query.value(4).toString()));
-		//         qDebug()<<query.value(4).toString();
+//         qDebug()<<query.value(4).toString();
+
 		if (query.value(4).toString() == "False") {
 			ui->SQLtableWidget->item(nrow, 5)->setBackgroundColor(Qt::red);
 		}
-		ui->SQLtableWidget->resizeColumnsToContents();
 
+		ui->SQLtableWidget->resizeColumnsToContents();
 		nrow++;
 	}
 
@@ -499,7 +488,7 @@ void MainWindow::on_evaluateAllPushButton_clicked() {
 			res = " -> result is NOT executable.";
 		}
 
-		// logging...
+// logging...
 
 		QString msg = "Evaluated sequence: " + sequenceName + res;
 
@@ -517,12 +506,9 @@ bool MainWindow::evaluateRules(QString sequenceName, bool display) {
 	QSqlQuery queryLogic(db4);
 
 	query.clear();
-
 //   qDebug()<< "evaluate rule sequence name: " << sequenceName;
-
 	query.prepare(
 			"SELECT * FROM  ActionRules WHERE ruleType = 'R' AND name = :name AND ExperimentalLocationId = :house ORDER BY ruleOrder");
-
 	query.bindValue(":name", sequenceName);
 	query.bindValue(":house", houseLocation);
 
@@ -570,7 +556,6 @@ bool MainWindow::evaluateRules(QString sequenceName, bool display) {
 //        qDebug()<<ANDORSwitch;
 
 			queryLogic.clear();
-
 			//     queryLogic.prepare(query.value(6).toString());
 
 			if (!queryLogic.exec(query.value(6).toString())) {
@@ -596,8 +581,8 @@ bool MainWindow::evaluateRules(QString sequenceName, bool display) {
 				//       qDebug()<<" <-- false";
 			}
 
-			if (recCount == 1)             // first record
-					{
+			// first record
+			if (recCount == 1) {
 				overallresult = result;
 				prevANDORSwitch = ANDORSwitch;
 
@@ -620,8 +605,8 @@ bool MainWindow::evaluateRules(QString sequenceName, bool display) {
 					}
 					// overallresult = overallresult && result;
 				}
-				prevANDORSwitch = ANDORSwitch;
 
+				prevANDORSwitch = ANDORSwitch;
 			}
 		}
 	}
@@ -636,45 +621,41 @@ bool MainWindow::evaluateRules(QString sequenceName, bool display) {
 
 void MainWindow::on_executePushButton_clicked() {
 	QString sequenceName = ui->sequenceTableWidget->item(ui->sequenceTableWidget->currentRow(), 0)->text();
-
 	runSequence(sequenceName, 0, "No", ui->sequenceTableWidget->currentRow());
-
-//    executionResult = executeSequence(sequenceName, true);
-
+//executionResult = executeSequence(sequenceName, true);
 	checkExecutionResult();
+}
 
+void MainWindow::checkStopExecution() {
+	if (stopExecution) {
+		throw threadInterruptedException();
+	}
 }
 
 int MainWindow::executeSequence(QString sequenceName, bool display) {
-
+	checkStopExecution();
 	QString indentSpaces = "";
 
 	for (int i = 0; i < indent; i++) {
 		indentSpaces += " ";
-
 	}
+
 	int returnResult = 0;
-
 	bool overallresult = evaluateRules(sequenceName, display);
-
 	qDebug() << indentSpaces + "               Evaluated " << sequenceName << " result " << overallresult;
 
-	if (!overallresult)       // no logner executable!
-	{
-		//       qDebug()<<indentSpaces + "               " + sequenceName << " not executable anymore!";
-		//       returnResult = RULES_INVALID;
+// no longer executable!
+	if (!overallresult) {
+//       qDebug()<<indentSpaces + "               " + sequenceName << " not executable anymore!";
+//       returnResult = RULES_INVALID;
 		return returnResult;
 	}
 
-	// get the set of actions for this sequence
-
+// get the set of actions for this sequence
 	QSqlQuery query(db1);
-
 	query.clear();
-
 	query.prepare(
 			"SELECT action FROM  ActionRules WHERE name = :name AND ruleType = \"A\" and ExperimentalLocationId = :house ORDER BY ruleOrder");
-
 	query.bindValue(":name", sequenceName);
 	query.bindValue(":house", houseLocation);
 
@@ -684,14 +665,11 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 		return returnResult;
 	}
 
-	// for each action - execute it via the script server
+// for each action - execute it via the script server
 
 	while (query.next()) {
-
-		// unpack query
-
+// unpack query
 		QString str = query.value(0).toString();
-
 		qDebug() << indentSpaces + "               " + str;
 
 		cname = str.section(',', 0, 0);
@@ -700,10 +678,8 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 		pname1 = str.section(',', 3, 3);
 		wait = str.section(',', 4, 4);
 
-		// lock the Sienna GUI if doing anything but sleeping
-
+// lock the Sienna GUI if doing anything but sleeping
 		QSqlQuery Lockquery(db7);
-
 		Lockquery.clear();
 
 		if (cname == "tray" || cname == "base" || cname == "torso" || cname == "eyes" || cname == "head"
@@ -729,76 +705,69 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 
 		string returnRes = "SUCCEEDED";
 
-		// check each command in turn and form the appropriate script server message
-		//
-		//  function name
-		//  component name
-		//  parameter name
-		//  duration
+// check each command in turn and form the appropriate script server message
+//
+//  function name
+//  component name
+//  parameter name
+//  duration
 
-		// -----------
-		// make the robot say something - format:  say "" ['hello'] ""
-		// -----------
+// -----------
+// make the robot say something - format:  say "" ['hello'] ""
+// -----------
 
 		if (cname == "speak") {
 			if (runWithROS) {
+				checkStopExecution();
 				robot->say(pname.toStdString(), "", blocking);
 			}
 
 			qDebug() << indentSpaces + "               Say " << pname;
-
 			returnResult = 0;
 
 		}
 
-		// -----------
-		// set the light colour - format:   "" set_light red ""
-		// -----------
-
+// -----------
+// set the light colour - format:   "" set_light red ""
+// -----------
 		if (cname == "light") {
-
 			if (runWithROS) {
+				checkStopExecution();
 				robot->setLight(pname.toStdString());
 			}
 
 			qDebug() << indentSpaces + "               Set light to " << pname;
-
 			returnResult = 0;
 		}
 
-		// -----------
-		// make the robot go to sleep - format: sleep "" "" 10
-		// -----------
-
+// -----------
+// make the robot go to sleep - format: sleep "" "" 10
+// -----------
 		if (cname == "sleep") {
 			double p = pname.toDouble();
 			p = p * 1000;
 			int t = p;
 			//   qDebug()<<t;
 			if (runWithROS) {
+				checkStopExecution();
 				robot->sleep(t);
 			}
 
 			qDebug() << indentSpaces + "               Sleep for " << pname << " seconds";
-
 			returnResult = 0;
-
 		}
 
-		// -----------
-		// actuation - format: move base [x,y,theta] ""
-		//                     move tray up ""
-		//                     move torso nod ""
-		//                     move eyes forward ""
-		//                     move head left ""
-		// -----------
-
+// -----------
+// actuation - format: move base [x,y,theta] ""
+//                     move tray up ""
+//                     move torso nod ""
+//                     move eyes forward ""
+//                     move head left ""
+// -----------
 		if (cname == "tray" || cname == "base" || cname == "torso" || cname == "eyes" || cname == "head"
 				|| cname == "arm") {
-
 			// logic for base is: send x,y,theta from db location, if theta spec'ed by user use that
 			//                    if go to user (999) send string "userLocation" and let the context system sort it out.
-
 			if (cname == "base") {
 				pname.remove('[');
 				pname.remove(']');
@@ -815,12 +784,13 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 				pos.at(2) = radians;
 
 				// but use the database location if available
-
 				if (pname1 != "") {
 					if (pname1 == "999") {
 						if (runWithROS) {
+							checkStopExecution();
 							returnRes = robot->setComponentState(cname.toStdString(), "userLocation", blocking);
 						}
+
 						qDebug() << indentSpaces + "               Set " << cname << " to " << pname << " " << wait;
 
 						if (returnRes != "SUCCEEDED") {
@@ -830,12 +800,9 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 						}
 					} else {
 						QSqlQuery locationQuery(db7);
-
 						locationQuery.clear();
-
 						locationQuery.prepare(
 								"SELECT xCoord,yCoord,orientation from Locations WHERE locationId = :locn LIMIT 1");
-
 						locationQuery.bindValue(":locn", pname1);
 
 						if (locationQuery.exec()) {
@@ -844,7 +811,6 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 								pos.at(1) = locationQuery.value(1).toDouble();
 								pos.at(2) = radians;
 							}
-
 						} else {
 							qDebug() << "Location query failed - using user given location vector";
 						}
@@ -852,11 +818,13 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 				}
 
 				if (runWithROS) {
+					checkStopExecution();
 					qDebug() << pos[0];
 					qDebug() << pos[1];
 					qDebug() << pos[2];
 					returnRes = robot->setComponentState(cname.toStdString(), pos, blocking);
 				}
+
 				qDebug() << indentSpaces + "               Set " << cname << " to " << pname1 << " " << wait;
 
 				if (returnRes != "SUCCEEDED") {
@@ -866,25 +834,26 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 				} else {
 					returnResult = 0;
 				}
-
 			}
 
-			//
-
-			if (cname == "tray" || cname == "torso" || cname == "eyes" || cname == "head" || cname == "arm") // differences between cob 3,2 and cob 3.5/6
-					{
-				if (pname == "store")
+			// differences between cob 3,2 and cob 3.5/6
+			if (cname == "tray" || cname == "torso" || cname == "eyes" || cname == "head" || cname == "arm") {
+				if (pname == "store") {
 					pname = "lowered";
-				if (pname == "deliverup")
+				}
+				if (pname == "deliverup") {
 					pname = "raised";
+				}
 
 				if (cname == "arm") {
 					pname = pname + ":" + pname1;
 				}
 
 				if (runWithROS) {
+					checkStopExecution();
 					returnRes = robot->setComponentState(cname.toStdString(), pname.toStdString(), blocking);
 				}
+
 				qDebug() << indentSpaces + "               Set " << cname << " to " << pname << " " << wait;
 
 				if (returnRes != "SUCCEEDED") {
@@ -897,19 +866,15 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 			}
 		}
 
-		// -----------
-		// The user GUI - doesn't use script server
-		// -----------
-
-		if (cname == "GUI")       // set the wait flag in db and await response
-				{
+// -----------
+// The user GUI - doesn't use script server
+// -----------
+// set the wait flag in db and await response
+		if (cname == "GUI") {
 
 			QSqlQuery GUIquery(db5);
-
 			GUIquery.clear();
-
 			GUIquery.prepare("UPDATE userInterfaceGUI SET guiMsgResult = NULL WHERE name = :name ");
-
 			GUIquery.bindValue(":name", sequenceName);
 
 			if (!GUIquery.exec()) {
@@ -921,11 +886,11 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 			int numSeconds = 0;
 
 			while (awaitingUserResponse) {
-
+				checkStopExecution();
 				numSeconds++;
 
-				if (numSeconds > 60)          // what should we do if the user doesn't respond?
-						{
+				// what should we do if the user doesn't respond?
+				if (numSeconds > 60) {
 					//          returnResult = USER_TIMEOUT;
 					//          return returnResult;
 					qDebug() << "User hasn't responded to GUI...";
@@ -933,13 +898,9 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 				}
 
 				sleep(1);
-
 				//       qDebug()<<numSeconds;
-
 				GUIquery.clear();
-
 				GUIquery.prepare("SELECT guiMsgResult FROM userInterfaceGUI WHERE name = :name ");
-
 				GUIquery.bindValue(":name", sequenceName);
 
 				if (!GUIquery.exec()) {
@@ -948,7 +909,6 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 				}
 
 				GUIquery.next();
-
 				QString resultFromUser = GUIquery.value(0).toString();
 
 				//     qDebug()<<resultFromUser;
@@ -965,31 +925,26 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 						pname.section("@", resultFromUser.toInt() - 1, resultFromUser.toInt() - 1), false);
 				indent -= 3;
 			}
-
 		}
 
-		// -----------
-		// set logical goals and conditions - doesn't use script server
-		// -----------
-
+// -----------
+// set logical goals and conditions - doesn't use script server
+// -----------
 		if (cname == "cond") {
 			QSqlQuery Goalquery(db6);
-
 			Goalquery.clear();
-
 			Goalquery.prepare(
 					"INSERT INTO SensorLog (timestamp,sensorId,room,channel,value,status) VALUES (NOW(),:goalId,'','',:value,:truefalse)");
-
 			Goalquery.bindValue(":value", pname1);
 			Goalquery.bindValue(":goalId", pname);
 
 			QString TF = "true";
 
-			if (pname1 == "0")
+			if (pname1 == "0") {
 				TF = "false";
+			}
 
 			Goalquery.bindValue(":truefalse", TF);
-
 			//        qDebug()<<"               Updating goals: pane1" << pname1 << " pname " << pname;
 
 			if (!Goalquery.exec()) {
@@ -997,13 +952,10 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 			}
 		}
 
-		// expressions on the Siena GUI - doesn't use script server
-
+// expressions on the Siena GUI - doesn't use script server
 		if (cname == "expression") {
 			QSqlQuery Goalquery(db6);
-
 			Goalquery.clear();
-
 			db6.database().transaction();
 			Goalquery.prepare("UPDATE GUIexpression SET ison = 0 WHERE ison = 1");
 			if (!Goalquery.exec()) {
@@ -1011,27 +963,22 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 			}
 
 			qDebug() << indentSpaces + "               Updating expression to " << pname1;
-
 			Goalquery.prepare("UPDATE GUIexpression SET ison = 1 WHERE id = :id");
 			Goalquery.bindValue(":id", pname);
 			if (!Goalquery.exec()) {
 				returnResult = ACTIONGOALS_DB_ERROR_UPDATE;
 			}
-			db6.database().commit();
 
+			db6.database().commit();
 		}
 
-		// action possibilities on the Siena GUI - doesn't use script server
-
+// action possibilities on the Siena GUI - doesn't use script server
 		if (cname == "APoss") {
 			double currentLikelyhood;
 
 			QSqlQuery Goalquery(db6);
-
 			Goalquery.clear();
-
 			db6.database().transaction();
-
 			Goalquery.prepare("SELECT likelihood from ActionPossibilities where apid = :apid LIMIT 1");
 			Goalquery.bindValue(":apid", pname);
 
@@ -1042,6 +989,7 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 			while (Goalquery.next()) {
 				currentLikelyhood = Goalquery.value(0).toDouble();
 			}
+
 			//     qDebug()<<pname<<" " <<pname1;
 			//      qDebug()<<currentLikelyhood;
 			currentLikelyhood = pname1.toDouble();
@@ -1054,37 +1002,33 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 			if (!Goalquery.exec()) {
 				returnResult = ACTIONGOALS_DB_ERROR_UPDATE;
 			}
-			db6.database().commit();
 
+			db6.database().commit();
 		}
 
-		// -----------
-		// recursive calls to this routine
-		//-----------
-
+// -----------
+// recursive calls to this routine
+//-----------
 		if (cname == "sequence") {
 			//       qDebug()<<indentSpaces + "               Call made to " << pname;
 			indent += 3;
+			checkStopExecution();
 			returnResult = mainW->executeSequence(pname, false);
 			indent -= 3;
 		}
-
 	}  // end of while
 
-//   qDebug()<<"               Sequence: " + sequenceName + " finished";
-
+//qDebug()<<"               Sequence: " + sequenceName + " finished";
 	return returnResult;
 }
 
 void MainWindow::on_COBTestPushButton_clicked() {
-
 	if (!fillSequenceTable()) {
 		QApplication::quit();
 	}
 }
 
 void MainWindow::on_startSchedulerPushButton_clicked() {
-
 	logMessage("Starting scheduler...");
 
 	ui->COBTestPushButton->setEnabled(false);
@@ -1114,11 +1058,8 @@ void MainWindow::on_stopSchedulerPushButton_clicked() {
 	ui->COBTestPushButton->setEnabled(true);
 
 	logMessage("Stopping scheduler...");
-
 	timer.stop();
-
 	stopSequence(currentlyExecutingSequence);   // stops thread
-
 	logMessage("Scheduler stopped");
 
 	ui->startSchedulerPushButton->setEnabled(true);
@@ -1129,9 +1070,7 @@ void MainWindow::on_stopSchedulerPushButton_clicked() {
 	int rows = ui->sequenceTableWidget->rowCount();
 
 	for (int i = 0; i < rows; i++) {
-
 		ui->sequenceTableWidget->item(i, 0)->setBackgroundColor(Qt::white);
-
 	}
 
 }
@@ -1148,14 +1087,14 @@ void MainWindow::doSchedulerWork() {
 		QApplication::quit();
 	}
 
-	//    logMessage("Evaluating sequence list...");
+//    logMessage("Evaluating sequence list...");
 
 	QString readySequence = "";
 	int readyPriority = -1;
 	QString readyCanInterrupt = "No";
 	int readyRow = 0;
 
-	//    fillSequenceTable();
+//    fillSequenceTable();
 
 	int rows = ui->sequenceTableWidget->rowCount();
 
@@ -1169,7 +1108,7 @@ void MainWindow::doSchedulerWork() {
 
 		ui->sequenceTableWidget->item(i, 0)->setBackgroundColor(Qt::yellow);
 
-		//      logMessage("Evaluating: " + sequenceName);
+//      logMessage("Evaluating: " + sequenceName);
 
 		result = evaluateRules(sequenceName, false);
 
@@ -1184,8 +1123,8 @@ void MainWindow::doSchedulerWork() {
 		ui->sequenceTableWidget->repaint();
 
 		if (result) {
-			if (!overallresult)        // beacuse the list is in priority order the first valid rule is chosen
-			{
+			// because the list is in priority order the first valid rule is chosen
+			if (!overallresult) {
 				overallresult = true;
 				readySequence = sequenceName;
 				readyPriority = priority;
@@ -1202,20 +1141,17 @@ void MainWindow::doSchedulerWork() {
 	logMessage("Ready to execute: " + readySequence);
 	qDebug() << "           *** Ready to run: " << readySequence;
 
-	if (currentlyExecutingSequence == "")  // nothing currently executing
-			{
+// nothing currently executing
+	if (currentlyExecutingSequence == "") {
 		qDebug() << "           *** starting to run: " << readySequence;
-
 		runSequence(readySequence, readyPriority, readyCanInterrupt, readyRow);         // run the ready sequence
 	} else {
-		if (readyPriority > currentlyExecutingPriority && currentlyExecutingCanInterrupt == "Yes") // ready and higher priority
-				{
+// ready and higher priority
+		if (readyPriority > currentlyExecutingPriority && currentlyExecutingCanInterrupt == "Yes") {
 			qDebug() << "           ***!!! " << readySequence << " usurped " << currentlyExecutingSequence
 					<< " !!!****";
 			logMessage(readySequence + " usurped " + currentlyExecutingSequence);
-
 			stopSequence(currentlyExecutingSequence);
-
 			runSequence(readySequence, readyPriority, readyCanInterrupt, readyRow);
 		} else {
 			if (readySequence == currentlyExecutingSequence) {
@@ -1231,16 +1167,22 @@ void MainWindow::stopSequence(QString sequenceName) {
 	ui->sequenceTableWidget->item(currentlyExecutingRow, 1)->setBackgroundColor(Qt::white);
 
 	QSqlQuery GUIquery(db7);  // kill the gui if necessary
-
 	GUIquery.clear();
-
 	GUIquery.prepare("UPDATE userInterfaceGUI SET guiMsgResult = 0 WHERE name = :name ");
-
 	GUIquery.bindValue(":name", sequenceName);
-
 	GUIquery.exec();
 
-	sched->terminate();
+// First try to cleanly exit the thread
+	stopExecution = true;
+	qDebug() << "Stopping sequence thread";
+	if (!sched->wait(5000)) {
+// Fallback to terminating the thread, but we're going to have to rebuild the robot class too,
+// since it's been left in an indeterminite state
+		qDebug() << " !!!*** Thread did not close in time, terminating, scheduler may be in an unstable state ***!!!";
+		sched->terminate();
+	} else {
+		qDebug() << "Thread cleanly stopped.";
+	}
 
 	currentlyExecutingSequence = "";
 }
@@ -1254,10 +1196,9 @@ void MainWindow::runSequence(QString sequenceName, int priority, QString CanInte
 	currentlyExecutingCanInterrupt = CanInterrupt;
 	currentlyExecutingRow = row;
 
+	stopExecution = false;
 	sched->start();
-
-	// checkExecutionResult();
-
+// checkExecutionResult();
 }
 
 void MainWindow::checkExecutionResult() {
@@ -1308,15 +1249,11 @@ void MainWindow::checkExecutionResult() {
 		msgBox.setText("Script server failed to execute command!");
 		msgBox.exec();
 		break;
-
 	}
-
 }
 void MainWindow::on_showNonSchedcheckBox_toggled(bool checked) {
 	ui->startSchedulerPushButton->setEnabled(!checked);
-
 	fillSequenceTable();
-
 }
 
 bool MainWindow::openDatabase(QString dbName, QString host, QString user, QString pw, QSqlDatabase& db) {
@@ -1330,10 +1267,8 @@ bool MainWindow::openDatabase(QString dbName, QString host, QString user, QStrin
 	dbOpen = db.open();
 
 	if (!dbOpen) {
-
 		QMessageBox msgBox;
 		msgBox.setIcon(QMessageBox::Critical);
-
 		msgBox.setText("Database error - login problem - see console log! Connection: " + dbName);
 		msgBox.exec();
 
@@ -1429,25 +1364,17 @@ void MainWindow::on_GUIradioButton4_clicked() {
 
 void MainWindow::updateGUI(int option) {
 	QSqlQuery GUIquery(db7);
-
 	GUIquery.clear();
-
 	GUIquery.prepare("UPDATE userInterfaceGUI SET guiMsgResult = :opt WHERE name = :name");
-
 	GUIquery.bindValue(":opt", option);
 	GUIquery.bindValue(":name", currentlyExecutingSequence);
-
 	GUIquery.exec();
 }
 
 void MainWindow::on_testPlannerPushButton_clicked() {
-
 	planNavigation("7");
-
 	planNavigation("26");
-
 	planNavigation("31");
-
 }
 
 void MainWindow::planNavigation(QString destination) {
@@ -1554,7 +1481,7 @@ void MainWindow::planNavigation(QString destination) {
 	out << "  (" << endl;
 	out << "" << endl;
 
-	// create the goal
+// create the goal
 
 	query.clear();
 	query.prepare("SELECT L.name, L.locationId from Locations L WHERE L.locationId = " + destination);
