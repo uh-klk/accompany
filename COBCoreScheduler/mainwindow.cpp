@@ -236,7 +236,8 @@ MainWindow::MainWindow(int argc, char** argv, QWidget *parent) :
 			// nothing we can do, so panic and exit
 			QMessageBox msgBox;
 			msgBox.setIcon(QMessageBox::Critical);
-			msgBox.setText("Robot interface did not build!  This seems to be related to clicking through the dialogs too quickly.");
+			msgBox.setText(
+					"Robot interface did not build!  This seems to be related to clicking through the dialogs too quickly.");
 			msgBox.exec();
 			closeDownRequest = true;
 			return;
@@ -620,9 +621,10 @@ bool MainWindow::evaluateRules(QString sequenceName, bool display) {
 }
 
 void MainWindow::on_executePushButton_clicked() {
+	robot->stop();
 	QString sequenceName = ui->sequenceTableWidget->item(ui->sequenceTableWidget->currentRow(), 0)->text();
 	runSequence(sequenceName, 0, "No", ui->sequenceTableWidget->currentRow());
-//executionResult = executeSequence(sequenceName, true);
+	//executionResult = executeSequence(sequenceName, true);
 	checkExecutionResult();
 }
 
@@ -644,14 +646,14 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 	bool overallresult = evaluateRules(sequenceName, display);
 	qDebug() << indentSpaces + "               Evaluated " << sequenceName << " result " << overallresult;
 
-// no longer executable!
+	// no longer executable!
 	if (!overallresult) {
-//       qDebug()<<indentSpaces + "               " + sequenceName << " not executable anymore!";
-//       returnResult = RULES_INVALID;
+		//qDebug()<<indentSpaces + "               " + sequenceName << " not executable anymore!";
+		//returnResult = RULES_INVALID;
 		return returnResult;
 	}
 
-// get the set of actions for this sequence
+	// get the set of actions for this sequence
 	QSqlQuery query(db1);
 	query.clear();
 	query.prepare(
@@ -665,10 +667,9 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 		return returnResult;
 	}
 
-// for each action - execute it via the script server
-
+	// for each action - execute it via the script server
 	while (query.next()) {
-// unpack query
+		// unpack query
 		QString str = query.value(0).toString();
 		qDebug() << indentSpaces + "               " + str;
 
@@ -678,18 +679,18 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 		pname1 = str.section(',', 3, 3);
 		wait = str.section(',', 4, 4);
 
-// lock the Sienna GUI if doing anything but sleeping
+		// lock the Sienna GUI if doing anything but sleeping
 		QSqlQuery Lockquery(db7);
 		Lockquery.clear();
 
 		if (cname == "tray" || cname == "base" || cname == "torso" || cname == "eyes" || cname == "head"
 				|| cname == "arm") {
 			Lockquery.prepare("UPDATE Sensors SET value = 1 WHERE sensorId = 1001");
-			//       sleep(5);
-			//       qDebug()<<"Set progress to 1";
+			//sleep(5);
+			//qDebug()<<"Set progress to 1";
 		} else {
 			Lockquery.prepare("UPDATE Sensors SET value = 0 WHERE sensorId = 1001");
-			//                  qDebug()<<"Set progress to 0";
+			//qDebug()<<"Set progress to 0";
 		}
 
 		if (!Lockquery.exec()) {
@@ -705,17 +706,15 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 
 		string returnRes = "SUCCEEDED";
 
-// check each command in turn and form the appropriate script server message
-//
-//  function name
-//  component name
-//  parameter name
-//  duration
-
-// -----------
-// make the robot say something - format:  say "" ['hello'] ""
-// -----------
-
+		// check each command in turn and form the appropriate script server message
+		//
+		//  function name
+		//  component name
+		//  parameter name
+		//  duration
+		// -----------
+		// make the robot say something - format:  say "" ['hello'] ""
+		// -----------
 		if (cname == "speak") {
 			if (runWithROS) {
 				checkStopExecution();
@@ -727,9 +726,9 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 
 		}
 
-// -----------
-// set the light colour - format:   "" set_light red ""
-// -----------
+		// -----------
+		// set the light colour - format:   "" set_light red ""
+		// -----------
 		if (cname == "light") {
 			if (runWithROS) {
 				checkStopExecution();
@@ -740,9 +739,9 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 			returnResult = 0;
 		}
 
-// -----------
-// make the robot go to sleep - format: sleep "" "" 10
-// -----------
+		// -----------
+		// make the robot go to sleep - format: sleep "" "" 10
+		// -----------
 		if (cname == "sleep") {
 			double p = pname.toDouble();
 			p = p * 1000;
@@ -757,17 +756,17 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 			returnResult = 0;
 		}
 
-// -----------
-// actuation - format: move base [x,y,theta] ""
-//                     move tray up ""
-//                     move torso nod ""
-//                     move eyes forward ""
-//                     move head left ""
-// -----------
+		// -----------
+		// actuation - format: move base [x,y,theta] ""
+		//                     move tray up ""
+		//                     move torso nod ""
+		//                     move eyes forward ""
+		//                     move head left ""
+		// -----------
 		if (cname == "tray" || cname == "base" || cname == "torso" || cname == "eyes" || cname == "head"
 				|| cname == "arm") {
 			// logic for base is: send x,y,theta from db location, if theta spec'ed by user use that
-			//                    if go to user (999) send string "userLocation" and let the context system sort it out.
+			// if go to user (999) send string "userLocation" and let the context system sort it out.
 			if (cname == "base") {
 				pname.remove('[');
 				pname.remove(']');
@@ -866,10 +865,10 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 			}
 		}
 
-// -----------
-// The user GUI - doesn't use script server
-// -----------
-// set the wait flag in db and await response
+		// -----------
+		// The user GUI - doesn't use script server
+		// -----------
+		// set the wait flag in db and await response
 		if (cname == "GUI") {
 
 			QSqlQuery GUIquery(db5);
@@ -891,14 +890,14 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 
 				// what should we do if the user doesn't respond?
 				if (numSeconds > 60) {
-					//          returnResult = USER_TIMEOUT;
-					//          return returnResult;
+					//returnResult = USER_TIMEOUT;
+					//return returnResult;
 					qDebug() << "User hasn't responded to GUI...";
 					numSeconds = 50;   // now inform every 10 seconds
 				}
 
 				sleep(1);
-				//       qDebug()<<numSeconds;
+				//qDebug() << numSeconds;
 				GUIquery.clear();
 				GUIquery.prepare("SELECT guiMsgResult FROM userInterfaceGUI WHERE name = :name ");
 				GUIquery.bindValue(":name", sequenceName);
@@ -927,9 +926,9 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 			}
 		}
 
-// -----------
-// set logical goals and conditions - doesn't use script server
-// -----------
+		// -----------
+		// set logical goals and conditions - doesn't use script server
+		// -----------
 		if (cname == "cond") {
 			QSqlQuery Goalquery(db6);
 			Goalquery.clear();
@@ -945,14 +944,14 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 			}
 
 			Goalquery.bindValue(":truefalse", TF);
-			//        qDebug()<<"               Updating goals: pane1" << pname1 << " pname " << pname;
+			//qDebug()<<"               Updating goals: pane1" << pname1 << " pname " << pname;
 
 			if (!Goalquery.exec()) {
 				returnResult = ACTIONGOALS_DB_ERROR_UPDATE;
 			}
 		}
 
-// expressions on the Siena GUI - doesn't use script server
+		// expressions on the Siena GUI - doesn't use script server
 		if (cname == "expression") {
 			QSqlQuery Goalquery(db6);
 			Goalquery.clear();
@@ -972,7 +971,7 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 			db6.database().commit();
 		}
 
-// action possibilities on the Siena GUI - doesn't use script server
+		// action possibilities on the Siena GUI - doesn't use script server
 		if (cname == "APoss") {
 			double currentLikelyhood;
 
@@ -990,10 +989,10 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 				currentLikelyhood = Goalquery.value(0).toDouble();
 			}
 
-			//     qDebug()<<pname<<" " <<pname1;
-			//      qDebug()<<currentLikelyhood;
+			//qDebug()<<pname<<" " <<pname1;
+			//qDebug()<<currentLikelyhood;
 			currentLikelyhood = pname1.toDouble();
-			//     qDebug()<<currentLikelyhood;
+			//qDebug()<<currentLikelyhood;
 
 			Goalquery.prepare("UPDATE ActionPossibilities SET likelihood = :like where apid = :apid");
 			Goalquery.bindValue(":apid", pname);
@@ -1006,9 +1005,9 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 			db6.database().commit();
 		}
 
-// -----------
-// recursive calls to this routine
-//-----------
+		// -----------
+		// recursive calls to this routine
+		//-----------
 		if (cname == "sequence") {
 			//       qDebug()<<indentSpaces + "               Call made to " << pname;
 			indent += 3;
@@ -1018,7 +1017,7 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 		}
 	}  // end of while
 
-//qDebug()<<"               Sequence: " + sequenceName + " finished";
+	//qDebug()<<"               Sequence: " + sequenceName + " finished";
 	return returnResult;
 }
 
@@ -1174,6 +1173,7 @@ void MainWindow::stopSequence(QString sequenceName) {
 
 // First try to cleanly exit the thread
 	stopExecution = true;
+	robot->stop();
 	qDebug() << "Stopping sequence thread";
 	if (!sched->wait(5000)) {
 // Fallback to terminating the thread, but we're going to have to rebuild the robot class too,
@@ -1198,7 +1198,7 @@ void MainWindow::runSequence(QString sequenceName, int priority, QString CanInte
 
 	stopExecution = false;
 	sched->start();
-// checkExecutionResult();
+	//checkExecutionResult();
 }
 
 void MainWindow::checkExecutionResult() {
