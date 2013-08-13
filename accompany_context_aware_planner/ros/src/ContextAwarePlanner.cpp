@@ -1,14 +1,15 @@
 #include "accompany_context_aware_planner/proxemics.h"
 #include <ros/ros.h>
 
-/*RH's Setting
+/*//RH's Setting
 #define DBHOST "tcp://localhost:3306"
 //#define DBHOST "tcp://10.0.1.54:3306" //robothouse database ip
 #define USER "rhUser"
 #define PASSWORD "waterloo"
 #define DATABASE "Accompany"
 */
-//Heerlen's Setting
+
+Heerlen's Setting
 #define DBHOST "tcp://192.168.1.142:3306" //robothouse database ip
 #define USER "accompanyUser"
 #define PASSWORD "accompany"
