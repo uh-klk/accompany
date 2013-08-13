@@ -9,7 +9,7 @@
 #define DATABASE "Accompany"
 */
 
-Heerlen's Setting
+//Heerlen's Setting
 #define DBHOST "tcp://192.168.1.142:3306" //robothouse database ip
 #define USER "accompanyUser"
 #define PASSWORD "accompany"
