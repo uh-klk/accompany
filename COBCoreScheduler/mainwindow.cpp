@@ -620,22 +620,31 @@ bool MainWindow::evaluateRules(QString sequenceName, bool display) {
 
 }
 
-void MainWindow::on_executePushButton_clicked() {
-	robot->stop();
+void MainWindow::on_executePushButton_clicked()
+{
+    if (runWithROS)
+    {
+       robot->stop();
+    }
 	QString sequenceName = ui->sequenceTableWidget->item(ui->sequenceTableWidget->currentRow(), 0)->text();
 	runSequence(sequenceName, 0, "No", ui->sequenceTableWidget->currentRow());
 	//executionResult = executeSequence(sequenceName, true);
 	checkExecutionResult();
 }
 
-void MainWindow::checkStopExecution() {
+void MainWindow::checkStopExecution()
+{
 	if (stopExecution) {
 		throw threadInterruptedException();
 	}
 }
 
-int MainWindow::executeSequence(QString sequenceName, bool display) {
-	checkStopExecution();
+int MainWindow::executeSequence(QString sequenceName, bool display)
+{
+    if (runWithROS)
+    {
+       checkStopExecution();
+    }
 	QString indentSpaces = "";
 
 	for (int i = 0; i < indent; i++) {
@@ -813,26 +822,31 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 						} else {
 							qDebug() << "Location query failed - using user given location vector";
 						}
+
+                        qDebug() << indentSpaces + "               Set " << cname << " to " << pname1 << " " << wait;
+
+                        if (runWithROS) {
+                            checkStopExecution();
+                            qDebug() << pos[0];
+                            qDebug() << pos[1];
+                            qDebug() << pos[2];
+                            returnRes = robot->setComponentState(cname.toStdString(), pos, blocking);
+                        }
+
+                        if (returnRes != "SUCCEEDED") {
+                            QString r = returnRes.c_str();
+                            qDebug() << indentSpaces + "               " << r;
+                            returnResult = 1;
+                        } else {
+                            returnResult = 0;
+                        }
+
+
+
 					}
 				}
 
-				if (runWithROS) {
-					checkStopExecution();
-					qDebug() << pos[0];
-					qDebug() << pos[1];
-					qDebug() << pos[2];
-					returnRes = robot->setComponentState(cname.toStdString(), pos, blocking);
-				}
 
-				qDebug() << indentSpaces + "               Set " << cname << " to " << pname1 << " " << wait;
-
-				if (returnRes != "SUCCEEDED") {
-					QString r = returnRes.c_str();
-					qDebug() << indentSpaces + "               " << r;
-					returnResult = 1;
-				} else {
-					returnResult = 0;
-				}
 			}
 
 			// differences between cob 3,2 and cob 3.5/6
@@ -884,8 +898,12 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 			bool awaitingUserResponse = true;
 			int numSeconds = 0;
 
-			while (awaitingUserResponse) {
-				checkStopExecution();
+            while (awaitingUserResponse)
+              {
+                if (runWithROS)
+                {
+                  checkStopExecution();
+                }
 				numSeconds++;
 
 				// what should we do if the user doesn't respond?
@@ -1011,7 +1029,10 @@ int MainWindow::executeSequence(QString sequenceName, bool display) {
 		if (cname == "sequence") {
 			//       qDebug()<<indentSpaces + "               Call made to " << pname;
 			indent += 3;
-			checkStopExecution();
+            if (runWithROS)
+            {
+               checkStopExecution();
+            }
 			returnResult = mainW->executeSequence(pname, false);
 			indent -= 3;
 		}
@@ -1053,6 +1074,7 @@ void MainWindow::on_startSchedulerPushButton_clicked() {
 }
 
 void MainWindow::on_stopSchedulerPushButton_clicked() {
+
 
 	ui->COBTestPushButton->setEnabled(true);
 
@@ -1173,7 +1195,10 @@ void MainWindow::stopSequence(QString sequenceName) {
 
 // First try to cleanly exit the thread
 	stopExecution = true;
-	robot->stop();
+    if (runWithROS)
+    {
+       robot->stop();
+    }
 	qDebug() << "Stopping sequence thread";
 	if (!sched->wait(5000)) {
 // Fallback to terminating the thread, but we're going to have to rebuild the robot class too,
