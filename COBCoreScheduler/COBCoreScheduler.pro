@@ -18,9 +18,9 @@ HEADERS  += mainwindow.h
 FORMS    += mainwindow.ui
 
 
-INCLUDEPATH +=  /home/joe/QTProjects/UHCore/Core/cpp
+INCLUDEPATH +=  ../UHCore/CppInterface/include
 INCLUDEPATH +=  /usr/include/python2.7/
 
-LIBS += -L/home/joe/QTProjects/UHCore/CppInterface/Debug -lUHCore
+LIBS += -L../UHCore/CppInterface/Debug -lUHCore
 LIBS += -lpython2.7
 
