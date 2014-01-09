@@ -6,6 +6,11 @@
 
 QT       += sql
 
+    QMAKE_CXXFLAGS_RELEASE -= -O2
+    QMAKE_CXXFLAGS_RELEASE += -O1
+    QMAKE_CXXFLAGS_RELEASE += -g
+
+
 TARGET = COBCoreScheduler
 TEMPLATE = app
 
@@ -23,4 +28,7 @@ INCLUDEPATH +=  /usr/include/python2.7/
 
 LIBS += -L../UHCore/CppInterface/Debug -lUHCore
 LIBS += -lpython2.7
+
+
+
 

@@ -15,10 +15,10 @@
   	<!-- MySQL server setting -->
 
   	<!-- UH Robot House -->
-  	<!-- param name="DBHOST" 	value="tcp://10.0.1.54:3306" /-->
-  	<!-- param name="USER"		value="rhUser" /-->
-  	<!-- param name="PASSWORD"	value="waterloo" /-->
-  	<!-- param name="DATABASE"	value="Accompany" /-->
+  	<param name="DBHOST" 	value="tcp://10.0.1.54:3306" />
+  	<param name="USER"		value="rhUser" />
+  	<param name="PASSWORD"	value="waterloo" />
+  	<param name="DATABASE"	value="AccompanyResources" />
 
 	<!-- Heerlen's Setting -->
 	<!-- param name="DBHOST" 	value="tcp://192.168.1.142:3306" /-->

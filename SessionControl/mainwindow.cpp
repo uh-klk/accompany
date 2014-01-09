@@ -24,7 +24,7 @@ void MainWindow::setup()
     QString host, user, pw, dBase;
 
 
-    ui->locnLabel->setText(lv);
+
 
     user = QInputDialog::getText ( this, "Accompany DB", "User:",QLineEdit::Normal,
                                    "", &ok);
@@ -66,6 +66,7 @@ void MainWindow::setup()
        if (host=="") host = "accompany1";
        if (user=="") user = "accompanyUser";
        if (pw=="") pw = "accompany";
+       if (dBase=="")     dBase = "Accompany";
 
     }
     else
@@ -73,10 +74,10 @@ void MainWindow::setup()
         if (host=="") host = "localhost";
         if (user=="") user = "rhUser";
         if (pw=="") pw = "waterloo";
+        if (dBase=="")     dBase = "AccompanyResources";
     }
 
 
-    if (dBase=="")     dBase = "Accompany";
 
     db = QSqlDatabase::addDatabase("QMYSQL");
 
@@ -107,7 +108,7 @@ void MainWindow::setup()
     {
         qDebug() << "Database Opened";
     }
-
+    ui->locnLabel->setText(lv + ":" + user + ":" + host + ":" + dBase) ;
     // fill the fields
 
     QSqlQuery query("SELECT ExperimentalLocationId, SessionUser, sessionTimeOffsetMin, SessionTimeOffsetHours FROM SessionControl WHERE SessionId = 1 LIMIT 1");

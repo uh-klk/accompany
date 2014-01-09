@@ -89,6 +89,7 @@ void MainWindow::setup()
        if (host=="") host = "accompany1";
        if (user=="") user = "accompanyUser";
        if (pw=="") pw = "accompany";
+       if (dBase=="")  dBase = "Accompany";
 
     }
     else
@@ -96,13 +97,14 @@ void MainWindow::setup()
         if (host=="") host = "localhost";
         if (user=="") user = "rhUser";
         if (pw=="") pw = "waterloo";
+        if (dBase=="")  dBase = "AccompanyResources";
     }
 
 
-    if (dBase=="")  dBase = "Accompany";
 
 
-    ui->userlabel->setText(lv + ":" + user + ":" + host);
+
+    ui->userlabel->setText(lv + ":" + user + ":" + host + ":" + dBase);
 
 
     db = QSqlDatabase::addDatabase("QMYSQL");
@@ -309,17 +311,17 @@ void MainWindow::on_robotLocationSpecButton_clicked()
 
     if (experimentLocation == 1)
     {
-        locQuery += " AND (L1.locationId < 500 OR L1.locationId = 999) ORDER BY L1.locationId";
+        locQuery += " AND (L1.locationId < 500 OR L1.locationId = 999 OR L1.locationId = 911) ORDER BY L1.locationId";
     }
 
      if (experimentLocation == 2)
      {
-         locQuery += " AND ((L1.locationId > 599 AND L1.locationId < 700) OR L1.locationId = 999) ORDER BY L1.locationId";
+         locQuery += " AND ((L1.locationId > 599 AND L1.locationId < 700) OR L1.locationId = 999 OR L1.locationId = 911) ORDER BY L1.locationId";
      }
 
      if (experimentLocation == 3)
      {
-         locQuery += " AND ((L1.locationId > 699 AND L1.locationId < 800) OR L1.locationId = 999) ORDER BY L1.locationId";
+         locQuery += " AND ((L1.locationId > 699 AND L1.locationId < 800) OR L1.locationId = 999 OR L1.locationId = 911) ORDER BY L1.locationId";
      }
     QSqlQuery query(locQuery);
 
@@ -596,7 +598,7 @@ void MainWindow::on_seqAddButton_clicked()
 
     ui->addActionButton->setEnabled(true);
 
- //   ui->pythonCreatePushButton->setEnabled(true);
+    ui->pythonCreatePushButton->setEnabled(true);
 
     fillActionRuleTable("");
 
@@ -869,7 +871,7 @@ void MainWindow::fillActionRuleTable(QString seqName)
    ui->delRuleButton->setEnabled(false);
 
    ui->addActionButton->setEnabled(true);
-//   ui->pythonCreatePushButton->setEnabled(true);
+   ui->pythonCreatePushButton->setEnabled(true);
 
 
 
@@ -983,9 +985,17 @@ void MainWindow::on_addRuleButton_clicked()
         QString QuestionRobotId    = ui->robotLocationRobotComboBox->currentText().section("::", 1, 1);
         QString QuestionUserId     = ui->userLocationUserComboBox->currentText().section("::", 1, 1);
 
-        if (QuestionLocationId == "999")
+        if (QuestionLocationId == "999" || QuestionLocationId == "911")
         {
-            rule = "SELECT r.locationId, u.locationId FROM Robot r, Users u WHERE u.userid = " + QuestionUserId + " AND r.robotId = " + QuestionRobotId + " AND r.locationId = u.locationId";
+            if (QuestionLocationId == "999")
+            {
+             rule = "SELECT r.locationId, u.locationId FROM Robot r, Users u WHERE u.userid = " + QuestionUserId + " AND r.robotId = " + QuestionRobotId + " AND r.locationId = u.locationId";
+            }
+            else
+            {
+             rule = "SELECT r.locationId, u.locationId FROM Robot r, Users u WHERE u.userid = " + QuestionUserId + " AND r.robotId = " + QuestionRobotId + " AND r.locationId != u.locationId";
+            }
+
         }
         else
         {                                                                   // complex rule due to hierachy of locns
@@ -2137,6 +2147,44 @@ void MainWindow::on_addActionButton_clicked()
 
         updateActionDB("speak", sequenceName,actiontext,action);
     }
+
+    if (ui->robotSaveMemoryCheckBox->isChecked())
+    {
+        actiontext = "save action history async";
+        action = "save";
+        updateActionDB("save", sequenceName,actiontext,action);
+    }
+
+    //-------------------------------------------------------
+    if (ui->playSoundCheckBox->isChecked())
+    {
+        QString play = ui->playComboBox->currentText();
+
+        if (play == "")
+        {
+            QMessageBox msgBox;
+            msgBox.setIcon(QMessageBox::Warning);
+
+            msgBox.setText("Nothing for robot to play!");
+            msgBox.exec();
+            return;
+
+        }
+
+
+        actiontext = ui->robotComboBox->currentText() + " plays '" + play + "'";
+        action = "play," + ui->robotComboBox->currentText().section("::", 1, 1) + "," + play;
+
+        if (ui->playWaitCheckBox->isChecked())
+        {
+             actiontext+=" and wait for completion";
+             action +=   ",,wait";
+        }
+
+        updateActionDB("play", sequenceName,actiontext,action);
+    }
+
+
     //-------------------------------------------------------
     if (ui->actionSequenceCheckBox->isChecked())
     {
@@ -2889,21 +2937,31 @@ void MainWindow::fillRuleActionTable(QString name, int Id, QString type, bool ch
                   ruletext = name + " is " + status;
               }
 
-              if ( Id > 499 && Id < 600 )   // goals/conditions
+              // trayIs and trayStatus use sensor status as value contains the actual positions or sensor values
+              // codes 500 and 501 therefore check sensor-status
+
+              if ( Id == 500 || Id == 501 )   // goals/conditions
               {
-                 rule = "SELECT * FROM Sensors WHERE sensorId = "  + v1.setNum(Id) + " AND value = \"" + type + "\"";
+                 rule = "SELECT * FROM Sensors WHERE sensorId = "  + v1.setNum(Id) + " AND status = \"" + type + "\"";
               }
               else
               {
-                  if (type == "On:Off")
-                  {
+                 if ( Id > 501 && Id < 600 )   // goals/conditions
+                 {
+                   rule = "SELECT * FROM Sensors WHERE sensorId = "  + v1.setNum(Id) + " AND value = \"" + type + "\"";
+                 }
+                 else
+                 {
+                   if (type == "On:Off")
+                   {
                     rule = "SELECT * FROM Sensors WHERE sensorId = "  + v1.setNum(Id) + " AND status = \"" + status + "\"";
-                  }
-                  else
-                  {
-                    rule = "SELECT * FROM Sensors WHERE sensorId = "  + v1.setNum(Id) + " AND value = " + v;
-                  }
-              }
+                   }
+                   else
+                   {
+                     rule = "SELECT * FROM Sensors WHERE sensorId = "  + v1.setNum(Id) + " AND value = " + v;
+                   }
+                 }
+             }
           }
 
 
@@ -3357,18 +3415,20 @@ void MainWindow::resetGui()
 
      ui->SeqComboBox->clearEditText();
 
+
+     query.clear();
+
+     query.prepare("SELECT scenario FROM ScenarioType order by scenario");
+
+     query.exec();
+
      ui->seqTypeComboBox->clear();
-     ui->seqTypeComboBox->addItem("High Level");
-     ui->seqTypeComboBox->addItem("user");
-     ui->seqTypeComboBox->addItem("Mid level");
-     ui->seqTypeComboBox->addItem("Low Level");
-     ui->seqTypeComboBox->addItem("Protected");
-     ui->seqTypeComboBox->addItem("scenario1");
-     ui->seqTypeComboBox->addItem("scenario2");
-     ui->seqTypeComboBox->addItem("scenario3");
-     ui->seqTypeComboBox->addItem("scenario4");
-     ui->seqTypeComboBox->addItem("scenario5");
-     ui->seqTypeComboBox->addItem("scenario6");
+
+      while(query.next())
+      {
+          ui->seqTypeComboBox->addItem(query.value(0).toString());
+      }
+
 
 
      ui->prioritySpinBox->setEnabled(false);
@@ -3443,6 +3503,7 @@ void MainWindow::resetGui()
 
 
      ui->speakGroupBox->setEnabled(false);
+     ui->playGroupBox->setEnabled(false);
 
      ui->colourComboBox->clear();
      ui->colourComboBox->addItem("red");
@@ -3480,7 +3541,7 @@ void MainWindow::resetGui()
 
      fillActionRuleTable("");
 
-  //   ui->pythonCreatePushButton->setEnabled(false);
+     ui->pythonCreatePushButton->setEnabled(false);
      ui->addActionButton->setEnabled(false);
      ui->addRuleButton->setEnabled(false);
      ui->delRuleButton->setEnabled(false);
@@ -3643,6 +3704,34 @@ void MainWindow::on_robotSpeakCheckBox_toggled(bool checked)
         actionCount--;
     }
 }
+
+void MainWindow::on_playSoundCheckBox_toggled(bool checked)
+{
+    ui->playGroupBox->setEnabled(checked);
+
+    QString Qry = "SELECT playFileName FROM PlaySounds";
+
+    if (checked)
+    {
+        QSqlQuery query(Qry);
+
+        ui->playComboBox->clear();
+
+        while(query.next())
+        {
+            ui->playComboBox->addItem(query.value(0).toString());
+        }
+
+        actionCount++;
+    }
+    else
+    {
+        actionCount--;
+    }
+}
+
+
+
 
 void MainWindow::on_actionSequenceCheckBox_toggled(bool checked)
 {
@@ -3913,7 +4002,7 @@ void MainWindow::on_pythonCreatePushButton_clicked()
 
                msgBox.setText("Can only generate python for Care-o-Bot at present!");
                msgBox.exec();
-               return;
+       //        return;
             }
             
             if (action == "base")
@@ -4831,7 +4920,7 @@ void MainWindow::on_condAddRuleButton_clicked()
 
     QSqlQuery query;
 
-    query.prepare("SELECT MAX(sensorId) FROM Accompany.Sensors where sensorId >499 and sensorId < 600 ");
+    query.prepare("SELECT MAX(sensorId) FROM Sensors where sensorId >499 and sensorId < 600 ");
 
     if (!query.exec())
     {
@@ -4865,7 +4954,7 @@ void MainWindow::on_condAddRuleButton_clicked()
 
         qDebug() << sId;
 
-        query.prepare("INSERT INTO Sensors VALUES (:sensorId, '0', '0', :name, '5', 'Predicate', 'N/A', '6',NOW(),NOW(),0,'false','false')");
+        query.prepare("INSERT INTO Sensors VALUES (:sensorId, '0', '0', :name, '5', 'Predicate', 'N/A', '6',NOW(),NOW(),0,'false','false',NULL,NULL,NULL,NULL)");
 
        query.bindValue(":sensorId",sId);
        query.bindValue(":name",ui->condLineEdit->text());
@@ -5097,4 +5186,18 @@ void MainWindow::on_apCheckBox_toggled(bool checked)
     {
         actionCount--;
     }
+}
+
+
+void MainWindow::on_robotSaveMemoryCheckBox_toggled(bool checked)
+{
+    if (checked)
+    {
+       actionCount++;
+    }
+    else
+    {
+        actionCount--;
+    }
+
 }

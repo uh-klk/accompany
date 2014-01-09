@@ -57,13 +57,14 @@ void MainWindow::setup()
        return;
     };
 
-    ui->locnLabel->setText(lv);
+
 
     if (lv=="ZUYD")
     {
        if (host=="") host = "accompany1";
        if (user=="") user = "accompanyUser";
        if (pw=="") pw = "accompany";
+       if (dBase=="")  dBase = "Accompany";
 
     }
     else
@@ -71,12 +72,11 @@ void MainWindow::setup()
         if (host=="") host = "localhost";
         if (user=="") user = "rhUser";
         if (pw=="") pw = "waterloo";
+        if (dBase=="")  dBase = "AccompanyResources";
     }
 
-    if (dBase=="")  dBase = "Accompany";
 
-
-    ui->userLabel->setText(user + ":" + host);
+    ui->locnLabel->setText(lv + ":" + user + ":" + host + ":" + dBase);
 
 
     db = QSqlDatabase::addDatabase("QMYSQL");
