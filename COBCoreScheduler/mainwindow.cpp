@@ -514,7 +514,7 @@ void MainWindow::on_sequenceTableWidget_cellClicked(int row, int column)
         QMessageBox msgBox;
         msgBox.setIcon(QMessageBox::Critical);
 
-        msgBox.setText("DB error - cannot select from ActionRules table!");
+        msgBox.setText("DB error -2- cannot select from ActionRules table!");
         msgBox.exec();
 
         QApplication::quit();
@@ -939,6 +939,10 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
 
     if (!query.exec())
     {
+        qDebug()<< query.lastError();
+        qDebug()<< query.lastQuery();
+        qDebug()<< query.executedQuery();
+
         returnResult = ACTIONRULES_DB_ERROR_SELECT;
         qDebug() << "Sequence Name: " << sequenceName;
         return returnResult;
@@ -980,12 +984,16 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
             return returnResult;
         }
 
-        bool blocking = false;
+    //    bool blocking = false;
 
-        if (wait == "wait")
-        {
-            blocking = true;
-        }
+   //     if (wait == "wait")
+   //     {
+   //         blocking = true;
+   //     }
+
+        // defualt to true in all cases (see Nathan for explanantion)
+
+        bool blocking = true;
 
         string returnRes = "SUCCEEDED";
 
@@ -1674,7 +1682,7 @@ void MainWindow::checkExecutionResult()
 
     case ACTIONRULES_DB_ERROR_SELECT:
         msgBox.setIcon(QMessageBox::Critical);
-        msgBox.setText("DB error - cannot select from ActionRules table!");
+        msgBox.setText("DB error -1- cannot select from ActionRules table!");
         msgBox.exec();
         break;
 
