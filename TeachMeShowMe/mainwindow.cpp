@@ -62,51 +62,84 @@ bool MainWindow::openDatabase()
 {
     bool ok;
 
-    QString host, user, pw, dataB;
+    QString host, user, pw, dBase;
+
+    QFile file("../UHCore/Core/config.py");
+
+    if (!file.exists())
+    {
+       qDebug()<<"No config.py found!!";
+    }
+
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+    {
+        closeDownRequest = true;
+        return false;
+    }
+
+    QTextStream in(&file);
+    while (!in.atEnd())
+    {
+       QString line = in.readLine();
+
+       if (line.contains("mysql_log_user"))
+       {
+          user = line.section("'",3,3);
+       }
+       if (line.contains("mysql_log_password"))
+       {
+           pw = line.section("'",3,3);
+       }
+       if (line.contains("mysql_log_server"))
+       {
+          host = line.section("'",3,3);
+       }
+       if (line.contains("mysql_log_db"))
+       {
+          dBase = line.section("'",3,3);
+       }
+    }
 
     user = QInputDialog::getText ( this, "Accompany DB", "User:",QLineEdit::Normal,
-                                   "", &ok);
+                                     user, &ok);
     if (!ok)
     {
+       closeDownRequest = true;
        return false;
     }
 
-
-
     pw = QInputDialog::getText ( this, "Accompany DB", "Password:", QLineEdit::Password,
-                                                                    "", &ok);
+                                                                      pw, &ok);
     if (!ok)
     {
+       closeDownRequest = true;
        return false;
     }
 
 
     host = QInputDialog::getText ( this, "Accompany DB", "Host:",QLineEdit::Normal,
-                                   "", &ok);
+                                     host, &ok);
     if (!ok)
     {
-       return false;
-    }
+      closeDownRequest = true;
+      return false;
+    };
 
-    dataB = QInputDialog::getText ( this, "Accompany DB", "Database:",QLineEdit::Normal,
-                                   "", &ok);
+    dBase = QInputDialog::getText ( this, "Accompany DB", "Database:",QLineEdit::Normal,
+                                     dBase, &ok);
     if (!ok)
     {
-       return false;
-    }
+      closeDownRequest = true;
+      return false;
+    };
 
 
-    if (host == "") host = "localhost";
-    if (user == "") user = "rhUser";
-    if (pw=="")     pw = "waterloo";
-    if (dataB=="")  dataB = "AccompanyResources";
-
-    ui->dbLabel->setText(user + ":" + host + ":" + dataB);
+    ui->dbLabel->setText(user + ":" + host + ":" + dBase);
 
     db = QSqlDatabase::addDatabase("QMYSQL");
 
     db.setHostName(host);
-    db.setDatabaseName(dataB);
+    db.setDatabaseName(dBase);
     db.setUserName(user);
     db.setPassword(pw);
 
@@ -1105,21 +1138,23 @@ void MainWindow::fillLocationWhen()
 
     while(query.next())
     {
-      q1 = q2 = q3 = "";
+ //     q1 = q2 = q3 = "";
 
-      if ( query.value(4).toString() != "")
-      {
-        if ( query.value(1) == 0)
-        {
-            q1 = "";
-        }
-        else
-        {
-            q1 = " in the " +   query.value(4).toString();
-        }
-      }
+ //     if ( query.value(4).toString() != "")
+ //     {
+  //      if ( query.value(1) == 0)
+ //       {
+ //           q1 = "";
+ //       }
+ //       else
+ //       {
+ //           q1 = " in the " +   query.value(4).toString();
+ //       }
+ //     }
 
-      q1 = q1 + " (" + query.value(0).toString() + ")";
+ //     q1 = q1 + " (" + query.value(0).toString() + ")";
+
+      q1 = " (" + query.value(0).toString() + ")";
 
       if (query.value(0).toString() != "0" && query.value(0).toString() != "999")
       {
@@ -2175,7 +2210,15 @@ void MainWindow::on_finalRememberPushButton_clicked()
     QString reset;
 //    reset.setNum(ui->resetSpinBox->value());
 
+    // always default reset to 1 minute
+
+    if (globalReset == 0)
+    {
+        globalReset = 60;
+    }
+
     reset.setNum(globalReset);
+
 
     qDebug()<<"Reset: "<< reset;
 

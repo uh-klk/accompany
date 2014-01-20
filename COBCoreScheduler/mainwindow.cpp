@@ -153,67 +153,84 @@ MainWindow::MainWindow(int argc, char** argv, QWidget *parent) :
 
     logTableRow = -1;
 
-    QString host, user, pw, dbase;
+    QString host, user, pw, dBase;
 
     closeDownRequest = false;
 
     bool ok;
 
-    user = QInputDialog::getText(this, "Accompany DB", "User:", QLineEdit::Normal, "", &ok);
-    if (!ok)
+    QFile file("../UHCore/Core/config.py");
+
+    if (!file.exists())
+    {
+       qDebug()<<"No config.py found!!";
+    }
+
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
     {
         closeDownRequest = true;
         return;
     }
 
-    pw = QInputDialog::getText(this, "Accompany DB", "Password:", QLineEdit::Password, "", &ok);
-    if (!ok)
+    QTextStream in(&file);
+    while (!in.atEnd())
     {
-        closeDownRequest = true;
-        return;
+       QString line = in.readLine();
+
+       if (line.contains("mysql_log_user"))
+       {
+          user = line.section("'",3,3);
+       }
+       if (line.contains("mysql_log_password"))
+       {
+           pw = line.section("'",3,3);
+       }
+       if (line.contains("mysql_log_server"))
+       {
+          host = line.section("'",3,3);
+       }
+       if (line.contains("mysql_log_db"))
+       {
+          dBase = line.section("'",3,3);
+       }
     }
 
-    host = QInputDialog::getText(this, "Accompany DB", "Host:", QLineEdit::Normal, "", &ok);
+    user = QInputDialog::getText ( this, "Accompany DB", "User:",QLineEdit::Normal,
+                                     user, &ok);
     if (!ok)
     {
-        closeDownRequest = true;
-        return;
+       closeDownRequest = true;
+       return;
+    }
+
+    pw = QInputDialog::getText ( this, "Accompany DB", "Password:", QLineEdit::Password,
+                                                                      pw, &ok);
+    if (!ok)
+    {
+       closeDownRequest = true;
+       return;
+    }
+
+
+    host = QInputDialog::getText ( this, "Accompany DB", "Host:",QLineEdit::Normal,
+                                     host, &ok);
+    if (!ok)
+    {
+      closeDownRequest = true;
+      return;
     };
 
-    dbase = QInputDialog::getText(this, "Database name", "Database:", QLineEdit::Normal, "", &ok);
+    dBase = QInputDialog::getText ( this, "Accompany DB", "Database:",QLineEdit::Normal,
+                                     dBase, &ok);
     if (!ok)
     {
-        closeDownRequest = true;
-        return;
+      closeDownRequest = true;
+      return;
     };
 
-    if (lv == "ZUYD")
-    {
-        if (host == "")
-            host = "accompany1";
-        if (user == "")
-            user = "accompanyUser";
-        if (pw == "")
-            pw = "accompany";
-        if (dbase =="")
-            dbase = "Accompany";
+    ui->userlabel->setText(lv + ":" + user + ":" + host + ":" + dBase);
 
-    }
-    else
-    {
-        if (host == "")
-            host = "localhost";
-        if (user == "")
-            user = "rhUser";
-        if (pw == "")
-            pw = "waterloo";
-        if (dbase =="")
-            dbase = "AccompanyResources";
-    }
-
-    ui->userlabel->setText(lv + ":" + user + ":" + host + ":" + dbase);
-
-    if (!openAllDatabaseConnections(host, user, pw, dbase))
+    if (!openAllDatabaseConnections(host, user, pw, dBase))
     {
         closeDownRequest = true;
         return;
