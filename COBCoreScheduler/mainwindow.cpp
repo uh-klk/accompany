@@ -29,6 +29,7 @@ using namespace std;
 #define SCRIPTSERVER_EXECUTION_FAILURE 7
 #define SENSORS_DB_ERROR_UPDATE 8
 
+
 std::string modulePath = "../UHCore/Core";
 
 class schedulerThread: public QThread
@@ -916,7 +917,8 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
         indentSpaces += " ";
     }
 
-    int returnResult = 0;
+    int returnResult = NO_PROBLEMS;
+
 //#    bool overallresult = evaluateRules(sequenceName, display);
 //#    qDebug() << indentSpaces + "               Evaluated " << sequenceName << " result " << overallresult;
 
@@ -940,7 +942,8 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
     if (!query.exec())
     {
         returnResult = ACTIONRULES_DB_ERROR_SELECT;
-        qDebug() << "Sequence Name: " << sequenceName;
+        qDebug() << "Execute Sequence Name: " << sequenceName;
+        qDebug() << query.lastError();
         return returnResult;
     }
 
@@ -977,15 +980,20 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
         if (!Lockquery.exec())
         {
             returnResult = SENSORS_DB_ERROR_UPDATE;
+            qDebug()<<Lockquery.lastError();
+            qDebug()<<"When Updating Sensors";
+
             return returnResult;
         }
 
-        bool blocking = false;
+        // set blocking to always true regardless of wait until Nathan fixed script server issue
 
-        if (wait == "wait")
-        {
-            blocking = true;
-        }
+        bool blocking = true;
+
+      //  if (wait == "wait")
+      //  {
+      //      blocking = true;
+      //  }
 
         string returnRes = "SUCCEEDED";
 
@@ -1007,7 +1015,7 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
             }
 
             qDebug() << indentSpaces + "               Say " << pname;
-            returnResult = 0;
+            returnResult = NO_PROBLEMS;
 
         }
 
@@ -1023,7 +1031,7 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
             }
 
             qDebug() << indentSpaces + "               Play " << pname;
-            returnResult = 0;
+            returnResult = NO_PROBLEMS;
 
         }
 
@@ -1039,7 +1047,7 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
             }
 
             qDebug() << indentSpaces + "               Set light to " << pname;
-            returnResult = 0;
+            returnResult = NO_PROBLEMS;
         }
 
         // -----------
@@ -1054,7 +1062,7 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
                 qDebug() << "action history call ** get latest version from Nathan";
             }
             qDebug() << indentSpaces + "               Save History Complete Async ";
-            returnResult = 0;
+            returnResult = NO_PROBLEMS;
         }
 
         // -----------
@@ -1073,7 +1081,7 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
             }
 
             qDebug() << indentSpaces + "               Sleep for " << pname << " seconds";
-            returnResult = 0;
+            returnResult = NO_PROBLEMS;
         }
 
         // -----------
@@ -1146,7 +1154,8 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
                         {
                             QString r = returnRes.c_str();
                             qDebug() << indentSpaces + "               " << r;
-                            returnResult = 1;
+                            returnResult = SCRIPTSERVER_EXECUTION_FAILURE;
+                            qDebug()<<"Problem with navigation to user location";
                         }
                     }
                     else
@@ -1186,11 +1195,12 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
                         {
                             QString r = returnRes.c_str();
                             qDebug() << indentSpaces + "               " << r;
-                            returnResult = 1;
+                            returnResult = SCRIPTSERVER_EXECUTION_FAILURE;
+                            qDebug()<<"Problem with navigation to location";
                         }
                         else
                         {
-                            returnResult = 0;
+                            returnResult = NO_PROBLEMS;
                         }
 
 
@@ -1230,11 +1240,12 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
                 {
                     QString r = returnRes.c_str();
                     qDebug() << indentSpaces + "               " << r;
-                    returnResult = 1;
+                    returnResult = SCRIPTSERVER_EXECUTION_FAILURE;
+                    qDebug()<<"Problem with " << cname;;
                 }
                 else
                 {
-                    returnResult = 0;
+                    returnResult = NO_PROBLEMS;
                 }
             }
 
@@ -1275,6 +1286,8 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
             if (!GUIquery.exec())
             {
                 returnResult = USERINTGUI_DB_ERROR_SELECT;
+                qDebug()<<"userInterfaceGUI table update";
+                qDebug() << GUIquery.lastError();
                 return returnResult;
             }
 
@@ -1307,6 +1320,8 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
                 if (!GUIquery.exec())
                 {
                     returnResult = USERINTGUI_DB_ERROR_SELECT;
+                    qDebug()<<"guiMsgResult table select";
+                    qDebug() << GUIquery.lastError();
                     return returnResult;
                 }
 
@@ -1349,11 +1364,13 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
             }
 
             Goalquery.bindValue(":truefalse", TF);
-            //qDebug()<<"               Updating goals: pane1" << pname1 << " pname " << pname;
+
 
             if (!Goalquery.exec())
             {
                 returnResult = ACTIONGOALS_DB_ERROR_UPDATE;
+                qDebug() << Goalquery.lastError();
+                qDebug()<<"Inserting to sensor log";
             }
         }
 
@@ -1367,6 +1384,8 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
             if (!Goalquery.exec())
             {
                 returnResult = ACTIONGOALS_DB_ERROR_UPDATE;
+                qDebug() << Goalquery.lastError();
+                qDebug()<<"updating GUIexpression ison 0";
             }
 
             qDebug() << indentSpaces + "               Updating expression to " << pname1;
@@ -1375,6 +1394,8 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
             if (!Goalquery.exec())
             {
                 returnResult = ACTIONGOALS_DB_ERROR_UPDATE;
+                qDebug() << Goalquery.lastError();
+                qDebug()<<"updating GUIexpression ison 1";
             }
 
             db10.database().commit();
@@ -1394,6 +1415,8 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
             if (!Goalquery.exec())
             {
                 returnResult = ACTIONGOALS_DB_ERROR_UPDATE;
+                qDebug() << Goalquery.lastError();
+                qDebug()<<"Selecting from ActionPossibilities";
             }
 
             while (Goalquery.next())
@@ -1413,6 +1436,8 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
             if (!Goalquery.exec())
             {
                 returnResult = ACTIONGOALS_DB_ERROR_UPDATE;
+                qDebug() << Goalquery.lastError();
+                qDebug()<<"Updating ActionPossibilities";
             }
 
             db6.database().commit();
