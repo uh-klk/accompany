@@ -28,6 +28,7 @@ using namespace std;
 #define ACTIONGOALS_DB_ERROR_UPDATE 6
 #define SCRIPTSERVER_EXECUTION_FAILURE 7
 #define SENSORS_DB_ERROR_UPDATE 8
+#define BEHAVIOUR_NOT_EXECUTABLE 9
 
 
 std::string modulePath = "../UHCore/Core";
@@ -585,8 +586,24 @@ void MainWindow::on_sequenceTableWidget_cellClicked(int row, int column)
         nrow++;
     }
 
-    ui->evaluatePushButton->setEnabled(true);
-    ui->executePushButton->setEnabled(true);
+    if (ui->startSchedulerPushButton->isEnabled())
+    {
+        ui->evaluatePushButton->setEnabled(true);
+        ui->executePushButton->setEnabled(true);
+    }
+    else
+    {
+        if (ui->showNonSchedcheckBox->isChecked())
+        {
+            ui->evaluatePushButton->setEnabled(true);
+            ui->executePushButton->setEnabled(true);
+        }
+        else
+        {
+          ui->evaluatePushButton->setEnabled(false);
+          ui->executePushButton->setEnabled(false);
+        }
+    }
 }
 
 void MainWindow::on_evaluateAllPushButton_clicked()
@@ -608,7 +625,7 @@ void MainWindow::on_evaluateAllPushButton_clicked()
 
         if (overallresult)
         {
-            overallresult = overallresult && evaluateResources(sequenceName);
+        //    overallresult = overallresult && evaluateResources(sequenceName);
             if (!overallresult)
             {
                 ui->sequenceTableWidget->setItem(i, 3, new QTableWidgetItem("No"));
@@ -904,9 +921,21 @@ void MainWindow::on_executePushButton_clicked()
 //   {
 //      robot->stop();
 //   }
+
+
+
     QString sequenceName = ui->sequenceTableWidget->item(ui->sequenceTableWidget->currentRow(), 0)->text();
-    runSequence(sequenceName, 0, "No", ui->sequenceTableWidget->currentRow());
-    //executionResult = executeSequence(sequenceName, true);
+
+    executionResult = 0;
+
+    if (evaluateRules(sequenceName, false))
+    {
+         runSequence(sequenceName, 0, "No", ui->sequenceTableWidget->currentRow());
+    }
+    else
+    {
+       executionResult = BEHAVIOUR_NOT_EXECUTABLE;
+    }
     checkExecutionResult();
 }
 
@@ -1112,7 +1141,7 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
                 || cname == "arm")
         {
             // resource lock
-
+            /*
             qDebug()<<"    Setting resource lock for:" << cname << " " << sequenceName << " " << rname << " " << houseLocation;
 
             QSqlQuery resourceQuery(db7);
@@ -1135,6 +1164,8 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
             }
 
             db7.database().commit();
+
+            */
 
             // logic for base is: send x,y,theta from db location, if theta spec'ed by user use that
             // if go to user (999) send string "userLocation" and let the context system sort it out.
@@ -1267,7 +1298,7 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
             }
 
             // clear resource lock
-
+            /*
             qDebug()<<"    Clearing resource lock for:" << cname << " " << sequenceName << " " << rname << " " << houseLocation;
 
             resourceQuery.clear();
@@ -1285,7 +1316,7 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
                 qDebug()<<"Delete failed " << resourceQuery.lastQuery() << " " << resourceQuery.lastError();
             }
             db7.database().commit();
-
+            */
         }
 
         // -----------
@@ -1581,7 +1612,7 @@ void MainWindow::doSchedulerWork()
 
         if (result)
         {
-            result = result && evaluateResources(sequenceName);
+    //        result = result && evaluateResources(sequenceName);
             if (!result)
             {
                 ui->sequenceTableWidget->setItem(i, 3, new QTableWidgetItem("No"));
@@ -1761,6 +1792,15 @@ void MainWindow::checkExecutionResult()
         msgBox.setText("DB error - cannot update Sensors table!");
         msgBox.exec();
         break;
+
+
+    case BEHAVIOUR_NOT_EXECUTABLE:
+        msgBox.setIcon(QMessageBox::Warning);
+        msgBox.setText("That behaviour is not currently executable!");
+        msgBox.exec();
+        break;
+
+
     }
 }
 void MainWindow::on_showNonSchedcheckBox_toggled(bool checked)
