@@ -337,7 +337,7 @@ void MainWindow::getLocations()
 
    while(query.next())
    {
-      if (query.value(0).toInt() == 0)
+      if (query.value(0).toInt() == 1)
       {
          ui->sofa1CheckBox->setChecked(false);
       }
@@ -355,7 +355,7 @@ void MainWindow::getLocations()
 
    while(query.next())
    {
-      if (query.value(0).toInt() == 0)
+      if (query.value(0).toInt() == 1)
       {
          ui->sofa2CheckBox->setChecked(false);
       }
@@ -373,7 +373,7 @@ void MainWindow::getLocations()
 
    while(query.next())
    {
-      if (query.value(0).toInt() == 0)
+      if (query.value(0).toInt() == 1)
       {
          ui->sofa3CheckBox->setChecked(false);
       }
@@ -382,6 +382,44 @@ void MainWindow::getLocations()
          ui->sofa3CheckBox->setChecked(true);
       }
    }
+
+
+   locQuery = "SELECT value from Sensors where sensorId = 18 LIMIT 1";
+   query.clear();
+   query = locQuery;
+
+   query.exec();
+
+   while(query.next())
+   {
+      if (query.value(0).toInt() == 1)
+      {
+         ui->sofa4CheckBox->setChecked(false);
+      }
+      else
+      {
+         ui->sofa4CheckBox->setChecked(true);
+      }
+   }
+
+   locQuery = "SELECT value from Sensors where sensorId = 19 LIMIT 1";
+   query.clear();
+   query = locQuery;
+
+   query.exec();
+
+   while(query.next())
+   {
+      if (query.value(0).toInt() == 1)
+      {
+         ui->sofa5CheckBox->setChecked(false);
+      }
+      else
+      {
+         ui->sofa5CheckBox->setChecked(true);
+      }
+   }
+
 
    locQuery = "SELECT value from Sensors where sensorId = 500 LIMIT 1";
 
@@ -511,13 +549,14 @@ void MainWindow::on_sofa1CheckBox_toggled(bool checked)
 {
    if (firstTime) return;
 
-   QString stat = "Free";
+   QString stat = "Occupied";
    if (checked)
    {
-      stat = "Occupied";
+      stat = "Free";
    }
 
-   updateSensorLog(15, checked, stat);
+
+   updateSensorLog(15, !checked, stat);
 }
 
 void MainWindow::on_fridgeCheckBox_toggled(bool checked)
@@ -551,26 +590,26 @@ void MainWindow::on_sofa2CheckBox_toggled(bool checked)
 {
     if (firstTime) return;
 
-    QString stat = "Free";
+    QString stat = "Occupied";
     if (checked)
     {
-       stat = "Occupied";
+       stat = "Free";
     }
 
-    updateSensorLog(16, checked, stat);
+    updateSensorLog(16, !checked, stat);
 }
 
 void MainWindow::on_sofa3CheckBox_toggled(bool checked)
 {
     if (firstTime) return;
 
-    QString stat = "Free";
+    QString stat = "Occupied";
     if (checked)
     {
-       stat = "Occupied";
+       stat = "Free";
     }
 
-    updateSensorLog(17, checked, stat);
+    updateSensorLog(17, !checked, stat);
 }
 
 
@@ -631,3 +670,28 @@ void MainWindow::on_userLocationComboBox_currentIndexChanged(QString locn)
 }
 
 
+void MainWindow::on_sofa4CheckBox_clicked(bool checked)
+{
+    if (firstTime) return;
+
+    QString stat = "Occupied";
+    if (checked)
+    {
+       stat = "Free";
+    }
+
+    updateSensorLog(18, !checked, stat);
+}
+
+void MainWindow::on_sofa5CheckBox_clicked(bool checked)
+{
+    if (firstTime) return;
+
+    QString stat = "Occupied";
+    if (checked)
+    {
+       stat = "Free";
+    }
+
+    updateSensorLog(19, !checked, stat);
+}

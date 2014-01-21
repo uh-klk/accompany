@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>509</width>
-    <height>450</height>
+    <width>733</width>
+    <height>481</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -18,9 +18,9 @@
     <property name="geometry">
      <rect>
       <x>20</x>
-      <y>220</y>
-      <width>461</width>
-      <height>161</height>
+      <y>230</y>
+      <width>701</width>
+      <height>181</height>
      </rect>
     </property>
     <property name="title">
@@ -88,7 +88,7 @@
       </rect>
      </property>
      <property name="text">
-      <string>Small Sofa Occupied</string>
+      <string>Sofa 3 Occupied</string>
      </property>
     </widget>
     <widget class="QCheckBox" name="trayCheckBox">
@@ -115,6 +115,32 @@
      </property>
      <property name="text">
       <string>Cup Empty/Full (Full if ticked)</string>
+     </property>
+    </widget>
+    <widget class="QCheckBox" name="sofa4CheckBox">
+     <property name="geometry">
+      <rect>
+       <x>420</x>
+       <y>30</y>
+       <width>151</width>
+       <height>23</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Sofa 4 Occupied</string>
+     </property>
+    </widget>
+    <widget class="QCheckBox" name="sofa5CheckBox">
+     <property name="geometry">
+      <rect>
+       <x>560</x>
+       <y>30</y>
+       <width>131</width>
+       <height>23</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Sofa 5 Occupied</string>
      </property>
     </widget>
    </widget>
@@ -147,9 +173,9 @@
    <widget class="QGroupBox" name="groupBox_5">
     <property name="geometry">
      <rect>
-      <x>20</x>
+      <x>50</x>
       <y>80</y>
-      <width>461</width>
+      <width>671</width>
       <height>61</height>
      </rect>
     </property>
@@ -161,7 +187,7 @@
       <rect>
        <x>50</x>
        <y>30</y>
-       <width>381</width>
+       <width>591</width>
        <height>25</height>
       </rect>
      </property>
@@ -170,9 +196,9 @@
    <widget class="QGroupBox" name="groupBox_6">
     <property name="geometry">
      <rect>
-      <x>20</x>
-      <y>150</y>
-      <width>461</width>
+      <x>50</x>
+      <y>160</y>
+      <width>671</width>
       <height>61</height>
      </rect>
     </property>
@@ -184,7 +210,7 @@
       <rect>
        <x>50</x>
        <y>30</y>
-       <width>381</width>
+       <width>601</width>
        <height>25</height>
       </rect>
      </property>
@@ -193,7 +219,7 @@
    <widget class="QPushButton" name="pushButton_2">
     <property name="geometry">
      <rect>
-      <x>190</x>
+      <x>300</x>
       <y>40</y>
       <width>96</width>
       <height>23</height>
@@ -224,8 +250,8 @@
    <widget class="QLabel" name="label_4">
     <property name="geometry">
      <rect>
-      <x>330</x>
-      <y>40</y>
+      <x>420</x>
+      <y>10</y>
       <width>71</width>
       <height>16</height>
      </rect>
@@ -237,9 +263,9 @@
    <widget class="QLabel" name="runningAtLabel">
     <property name="geometry">
      <rect>
-      <x>400</x>
-      <y>40</y>
-      <width>71</width>
+      <x>500</x>
+      <y>10</y>
+      <width>161</width>
       <height>16</height>
      </rect>
     </property>
@@ -253,7 +279,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>509</width>
+     <width>733</width>
      <height>22</height>
     </rect>
    </property>
