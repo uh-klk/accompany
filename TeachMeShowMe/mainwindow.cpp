@@ -23,7 +23,7 @@ int globalReset;
 
 int experimentLocation;   // 1 = UH, 2=HUYT 3=Madopa
 QString expLocation;
-int defaultUserId;
+
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -62,51 +62,85 @@ bool MainWindow::openDatabase()
 {
     bool ok;
 
-    QString host, user, pw, dataB;
+    QString host, user, pw, dBase;
+
+    QFile file("../UHCore/Core/config.py");
+
+    if (!file.exists())
+    {
+       qDebug()<<"No config.py found!!";
+    }
+
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+    {
+        closeDownRequest = true;
+        return false;
+    }
+
+    QTextStream in(&file);
+    while (!in.atEnd())
+    {
+       QString line = in.readLine();
+
+       if (line.contains("mysql_log_user"))
+       {
+          user = line.section("'",3,3);
+       }
+       if (line.contains("mysql_log_password"))
+       {
+           pw = line.section("'",3,3);
+       }
+       if (line.contains("mysql_log_server"))
+       {
+          host = line.section("'",3,3);
+       }
+       if (line.contains("mysql_log_db"))
+       {
+          dBase = line.section("'",3,3);
+       }
+    }
 
     user = QInputDialog::getText ( this, "Accompany DB", "User:",QLineEdit::Normal,
-                                   "", &ok);
+                                     user, &ok);
     if (!ok)
     {
+       closeDownRequest = true;
        return false;
     }
 
-
-
     pw = QInputDialog::getText ( this, "Accompany DB", "Password:", QLineEdit::Password,
-                                                                    "", &ok);
+                                                                      pw, &ok);
     if (!ok)
     {
+       closeDownRequest = true;
        return false;
     }
 
 
     host = QInputDialog::getText ( this, "Accompany DB", "Host:",QLineEdit::Normal,
-                                   "", &ok);
+                                     host, &ok);
     if (!ok)
     {
-       return false;
-    }
+      closeDownRequest = true;
+      return false;
+    };
 
-    dataB = QInputDialog::getText ( this, "Accompany DB", "Database:",QLineEdit::Normal,
-                                   "", &ok);
+    dBase = QInputDialog::getText ( this, "Accompany DB", "Database:",QLineEdit::Normal,
+                                     dBase, &ok);
     if (!ok)
     {
-       return false;
-    }
+      closeDownRequest = true;
+      return false;
+    };
+
+    QString dbUser = "Database: " + user + ":" + host + ":" + dBase;
 
 
-    if (host == "") host = "localhost";
-    if (user == "") user = "rhUser";
-    if (pw=="")     pw = "waterloo";
-    if (dataB=="")  dataB = "AccompanyResources";
-
-    ui->dbLabel->setText(user + ":" + host + ":" + dataB);
 
     db = QSqlDatabase::addDatabase("QMYSQL");
 
     db.setHostName(host);
-    db.setDatabaseName(dataB);
+    db.setDatabaseName(dBase);
     db.setUserName(user);
     db.setPassword(pw);
 
@@ -137,7 +171,18 @@ bool MainWindow::openDatabase()
     {
        experimentLocation = query.value(0).toInt();
        expLocation.setNum(experimentLocation);
-       defaultUserId = query.value(1).toInt();
+       defaultUser = query.value(1).toString();
+
+       QSqlQuery locn("select location from ExperimentalLocation where  id = '" + expLocation + "'  LIMIT 1");
+       locn.next();
+       dbUser += " :: Location: " + locn.value(0).toString();
+
+       QSqlQuery user("select nickname from Users where userId = '" + defaultUser +  "'  LIMIT 1");
+       user.next();
+       dbUser += " :: User: " + user.value(0).toString();
+
+
+
     }
     else
     {
@@ -149,6 +194,8 @@ bool MainWindow::openDatabase()
         closeDownRequest = true;
         return false;
     }
+
+    ui->dbLabel->setText(dbUser);
 
     return true;
 
@@ -260,6 +307,13 @@ void MainWindow::initialiseGUI()
        ui->hasHappendedSpinBox->setEnabled(false);
        ui->happeningSpinBox->setValue(0);
        ui->hasHappendedSpinBox->setValue(0);
+
+       ui->alwaysCheckBox->setChecked(true);
+       ui->resetSpinBox->setValue(0);
+
+
+       ui->whenTellMePushButton->hide();
+       ui->doingPushButton->hide();
 
 }
 
@@ -603,8 +657,6 @@ void MainWindow::on_okPushButton_clicked()
         return;
     }
 
-    fillFinalView();
-
     ui->alreadyKnowWidget->setTabEnabled(11,true);
     ui->alreadyKnowWidget->setCurrentIndex(11);
 
@@ -625,13 +677,12 @@ void MainWindow::on_alreadyKnowWidget_currentChanged(int index)
 
 
             case 0:
-              query.prepare("SELECT * FROM Sequences where (scenario = 'User Generated') and name not like 'reset%' \
-                            AND experimentalLocationId = '" +  expLocation + " order by scenarioDescription");
-              break;
-            case 1:
-              query.prepare("SELECT * FROM ActionRules where action LIKE 'speak%' AND experimentalLocationId = '" +  expLocation + "'");
+            query.prepare("SELECT * FROM Sequences where (scenario = 'User Generated') and name not like 'reset%' AND experimentalLocationId = '" +  expLocation + "' order by scenarioDescription");
               break;
             case 2:
+              query.prepare("SELECT * FROM ActionRules where action LIKE 'speak%' AND experimentalLocationId = '" +  expLocation + "'");
+              break;
+            case 1:
               {
               query.prepare("select S.scenarioDescription, S.name from Sequences S, ActionRules A where S.name = A.name and A.action LIKE 'base%' AND S.experimentalLocationId = '"\
                       +  expLocation + "' group by S.name");
@@ -648,6 +699,7 @@ void MainWindow::on_alreadyKnowWidget_currentChanged(int index)
                       AND L3.locationId = L2.where\
                       AND L4.locationId = L3.where\
                       AND L1.validRobotLocation = 1\
+                      AND (L1.locationID < 100 OR L1.locationID = 999)\
                         ORDER BY L1.locationId");
 
 
@@ -672,7 +724,7 @@ void MainWindow::on_alreadyKnowWidget_currentChanged(int index)
                           }
                       }
 
-                      if (locnQuery.value(0).toInt() != 0 && locnQuery.value(0).toInt() != 999 )
+                      if (locnQuery.value(0).toInt() != 0 ) // && locnQuery.value(0).toInt() != 999 )
                       {
                           ui->moveComboBox->addItem(locnQuery.value(3).toString() + q1 + " ::" + locnQuery.value(0).toString() + "::");
                       }
@@ -711,13 +763,13 @@ void MainWindow::on_alreadyKnowWidget_currentChanged(int index)
 
                          break;
 
-                     case 1:
+                     case 2:
 
                          list << "say \"" + query.value(7).toString().section(",", 2, 2) + "\"";
 
                         break;
 
-                     case 2:
+                     case 1:
 
                          list << query.value(0).toString() + " (" + query.value(1).toString() + ")";
 
@@ -749,11 +801,11 @@ void MainWindow::on_alreadyKnowWidget_currentChanged(int index)
              ui->allKnowHowListView->setModel( model );
              break;
 
-           case 1:
+           case 2:
              ui->speakKnowHowListView->setModel( model );
              break;
 
-           case 2:
+           case 1:
              ui->moveKnowHowListView->setModel( model );
              break;
 
@@ -1087,7 +1139,7 @@ void MainWindow::fillLocationWhen()
 
     ui->userLocnComboBox->clear();
     ui->userLocnComboBox->addItem("");
-
+// hard coded for UH!!
     QSqlQuery query("SELECT  L1.locationId, L1.where, L2.where, L1.name, IF(STRCMP(L1.name,L2.name),L2.name,''), IF(STRCMP(L2.name,L3.name),L3.name,''), IF(STRCMP(L3.name,L4.name),L4.name,'')\
                 FROM Locations L1,\
                      Locations L2,\
@@ -1097,6 +1149,7 @@ void MainWindow::fillLocationWhen()
                   AND L3.locationId = L2.where\
                   AND L4.locationId = L3.where\
                   AND L1.validUserLocation = 1\
+                  AND L1.locationId < 100\
                 ORDER BY L1.locationId");
 
     QString q1, q2, q3;
@@ -1105,21 +1158,23 @@ void MainWindow::fillLocationWhen()
 
     while(query.next())
     {
-      q1 = q2 = q3 = "";
+ //     q1 = q2 = q3 = "";
 
-      if ( query.value(4).toString() != "")
-      {
-        if ( query.value(1) == 0)
-        {
-            q1 = "";
-        }
-        else
-        {
-            q1 = " in the " +   query.value(4).toString();
-        }
-      }
+ //     if ( query.value(4).toString() != "")
+ //     {
+  //      if ( query.value(1) == 0)
+ //       {
+ //           q1 = "";
+ //       }
+ //       else
+ //       {
+ //           q1 = " in the " +   query.value(4).toString();
+ //       }
+ //     }
 
-      q1 = q1 + " (" + query.value(0).toString() + ")";
+ //     q1 = q1 + " (" + query.value(0).toString() + ")";
+
+      q1 = " (" + query.value(0).toString() + ")";
 
       if (query.value(0).toString() != "0" && query.value(0).toString() != "999")
       {
@@ -1141,6 +1196,7 @@ void MainWindow::fillLocationWhen()
                   AND L3.locationId = L2.where\
                   AND L4.locationId = L3.where\
                   AND L1.validRobotLocation = 1\
+                  AND L1.locationID < 100\
                 ORDER BY L1.locationId");
 
     query.exec();
@@ -1900,9 +1956,10 @@ void MainWindow::on_everyNdaysSpinBox_valueChanged(int val)
     if (val > 0)
     {
        ui->everyNHoursSpinBox->setValue(0);
-       ui->resetSpinBox->setValue(val * 3600 * 24);
+   //    ui->resetSpinBox->setValue(val * 3600 * 24);
        ui->resetSpinBox->setEnabled(false);
-       ui->alwaysCheckBox->setEnabled(false);
+   //    ui->alwaysCheckBox->setEnabled(false);
+       ui->alwaysCheckBox->setChecked(true);
     }
 
     if (val == 0)
@@ -1980,15 +2037,15 @@ void MainWindow::on_finalRememberPushButton_clicked()
 
            generateForWithinSQL(command, "sitSofa", "SELECT * FROM Sensors WHERE (sensorId = 15 or sensorId = 16 or sensorId = 17 or sensorId = 18  or sensorId = 19) and value = 0",actionText);
 
-           generateForWithinSQL(command, "TVOn", "SELECT * FROM Sensors WHERE sensorId = 49 AND status = 'on'",actionText);
+           generateForWithinSQL(command, "TVOn", "SELECT * FROM Sensors WHERE sensorId = 49 AND status = 'On'",actionText);
 
            generateForWithinSQL(command, "kitCpdOpen", "SELECT * FROM Sensors WHERE (sensorId = 3 or sensorId = 4 or sensorId = 5 or sensorId = 6  or sensorId = 7 or sensorId = 8 or sensorId = 9  or sensorId = 10) and value = 1",actionText);
 
-           generateForWithinSQL(command, "KitTapsOn", "SELECT * FROM Sensors WHERE (sensorId = 1 or sensorId = 2) AND status = 'on'",actionText);
+           generateForWithinSQL(command, "KitTapsOn", "SELECT * FROM Sensors WHERE (sensorId = 1 or sensorId = 2) AND status = 'On'",actionText);
 
-           generateForWithinSQL(command, "microOn", "SELECT * FROM Sensors WHERE (sensorId = 54 or sensorId = 44 or sensorId = 56) AND status = 'on'",actionText);
+           generateForWithinSQL(command, "microOn", "SELECT * FROM Sensors WHERE (sensorId = 54 or sensorId = 44 or sensorId = 56) AND status = 'On'",actionText);
 
-           generateForWithinSQL(command, "frgOn",  "SELECT * FROM Sensors WHERE (sensorId = 50 or sensorId = 51 or sensorId = 55) AND status = 'on'",actionText);
+           generateForWithinSQL(command, "frgOn",  "SELECT * FROM Sensors WHERE (sensorId = 50 or sensorId = 51 or sensorId = 55) AND status = 'On'",actionText);
 
            if (command == "DoorbellRang")  // within last 10 seconds
            {
@@ -1996,7 +2053,7 @@ void MainWindow::on_finalRememberPushButton_clicked()
                actionText  = "SELECT * FROM Sensors WHERE sensorId = 59 AND lastActiveValue > 0 and lastUpdate+INTERVAL 10 SECOND >= NOW()";
            }
 
-           generateForWithinSQL(command, "bathTapsOn", "SELECT * FROM Sensors WHERE (sensorId = 11 or sensorId = 12) AND status = 'on'",actionText);
+           generateForWithinSQL(command, "bathTapsOn", "SELECT * FROM Sensors WHERE (sensorId = 11 or sensorId = 12) AND status = 'On'",actionText);
 
            generateForWithinSQL(command, "bathDoorClosed", "SELECT * FROM Sensors WHERE sensorId = 13 AND value = 0",actionText);
 
@@ -2175,14 +2232,25 @@ void MainWindow::on_finalRememberPushButton_clicked()
     QString reset;
 //    reset.setNum(ui->resetSpinBox->value());
 
-    reset.setNum(globalReset);
+    // always default reset to 1 minute
 
-    qDebug()<<"Reset: "<< reset;
-
-    addActionRulesRow("reset-" + sequenceName,sId + sequenceName + " is false and has been for " + reset + " seconds", \
+    if (ui->alwaysCheckBox->isChecked())   // this implies that user turned off the reminder bit
+    {
+        // we reset at midnight
+        addActionRulesRow("reset-" + sequenceName,sId + sequenceName + " is false", "SELECT * FROM Sensors WHERE sensorId = " + sId + " AND value = 'false'",0,"R");
+        addActionRulesRow("reset-" + sequenceName,sId + sequenceName + " And it is between 1am and 2am", "CALL spBetweenTimeCheck('01:00:00','02:00:00') " ,1,"R");
+     }
+    else
+    {                                    // we reset/remind in this bit
+       reset.setNum(globalReset);
+       qDebug()<<"Reset: "<< reset;
+       addActionRulesRow("reset-" + sequenceName,sId + sequenceName + " is false and has been for " + reset + " seconds", \
                                    "SELECT * FROM Sensors WHERE sensorId = " + sId + " AND value = 'false' and lastUpdate+INTERVAL " + reset + " SECOND <= NOW()" ,0,"R");
+    }
 
-    addActionRulesRow("reset-" + sequenceName,"SET ::" + sId + "::" + sequenceName + " TO true", "cond,0," + sId + ",true" ,1,"A");
+
+
+    addActionRulesRow("reset-" + sequenceName,"SET ::" + sId + "::" + sequenceName + " TO true", "cond,0," + sId + ",true" ,2,"A");
 
     addSequenceRow   ("reset-" + sequenceName, "Reset condition " + sequenceName, 1, 80);
 
@@ -2767,6 +2835,7 @@ void MainWindow::on_everyNHoursSpinBox_valueChanged(int val )
        ui->everyNdaysSpinBox->setValue(0);
        ui->resetSpinBox->setValue(val * 3600);
        ui->resetSpinBox->setEnabled(false);
+       ui->alwaysCheckBox->setChecked(false);
        ui->alwaysCheckBox->setEnabled(false);
    }
 
@@ -2798,3 +2867,85 @@ void MainWindow::on_bathFlushCheckBox_clicked(bool checked)
 }
 
 
+
+void MainWindow::on_repeatFinishedPushButton_clicked()
+{
+    fillFinalView();
+
+    ui->alreadyKnowWidget->setTabEnabled(12,true);
+    ui->alreadyKnowWidget->setCurrentIndex(12);
+}
+
+void MainWindow::on_repeatLearnItPushButton_clicked()
+{
+    bool addedToLearn = false;
+    ui->repeatFinishedPushButton->show();
+
+    if (ui->resetSpinBox->value() > 0)
+    {
+        int v;
+        v = ui->resetSpinBox->value();
+
+        int days = v / 86400;
+        v = v%86400;
+
+        int hours=v/3600;
+        v = v%3600;
+
+        int min=v/60;
+        v = v%60;
+
+        int sec = v;
+
+        QString txt;
+
+        if (days > 0)
+        {
+            QString d;
+            d.setNum(days);
+            txt += d + " days ";
+        }
+
+        if (hours > 0)
+        {
+            QString h;
+            h.setNum(hours);
+            txt += h + " hours ";
+        }
+
+        if (min > 0)
+        {
+            QString m;
+            m.setNum(min);
+            txt += m + " minutes ";
+        }
+
+        if (sec > 0)
+        {
+            QString s;
+            s.setNum(sec);
+            txt += s + " seconds ";
+        }
+
+        addToLearningList("When: Remind me/Reset after " +  txt);
+        addedToLearn = true;
+    }
+
+
+
+    if (!addedToLearn)
+    {
+        QMessageBox msgBox;
+        msgBox.setIcon(QMessageBox::Warning);
+
+        msgBox.setText("You need to choose something for the robot to learn!");
+        msgBox.exec();
+
+       return;
+
+    }
+
+
+
+
+}

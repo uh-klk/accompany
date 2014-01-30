@@ -33,21 +33,55 @@ MainWindow::MainWindow(QWidget *parent) :
 
 void MainWindow::openbDB()
 {
-    QString host, user, pw, dbase;
+    QString host, user, pw, dBase;
     bool ok;
 
+    QFile file("../UHCore/Core/config.py");
+
+    if (!file.exists())
+    {
+       qDebug()<<"No config.py found!!";
+    }
+
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+    {
+        closeDownRequest = true;
+        return;
+    }
+
+    QTextStream in(&file);
+    while (!in.atEnd())
+    {
+       QString line = in.readLine();
+
+       if (line.contains("mysql_log_user"))
+       {
+          user = line.section("'",3,3);
+       }
+       if (line.contains("mysql_log_password"))
+       {
+           pw = line.section("'",3,3);
+       }
+       if (line.contains("mysql_log_server"))
+       {
+          host = line.section("'",3,3);
+       }
+       if (line.contains("mysql_log_db"))
+       {
+          dBase = line.section("'",3,3);
+       }
+    }
+
     user = QInputDialog::getText ( this, "Accompany DB", "User:",QLineEdit::Normal,
-                                   "", &ok);
+                                     user, &ok);
     if (!ok)
     {
        closeDownRequest = true;
        return;
     }
 
-
-
     pw = QInputDialog::getText ( this, "Accompany DB", "Password:", QLineEdit::Password,
-                                                                    "", &ok);
+                                                                      pw, &ok);
     if (!ok)
     {
        closeDownRequest = true;
@@ -56,32 +90,29 @@ void MainWindow::openbDB()
 
 
     host = QInputDialog::getText ( this, "Accompany DB", "Host:",QLineEdit::Normal,
-                                   "", &ok);
+                                     host, &ok);
     if (!ok)
     {
-       closeDownRequest = true;
-       return;
+      closeDownRequest = true;
+      return;
     };
 
-    dbase = QInputDialog::getText ( this, "Accompany DB", "Database:",QLineEdit::Normal,
-                                   "", &ok);
+    dBase = QInputDialog::getText ( this, "Accompany DB", "Database:",QLineEdit::Normal,
+                                     dBase, &ok);
     if (!ok)
     {
-       closeDownRequest = true;
-       return;
+      closeDownRequest = true;
+      return;
     };
 
     ui->runningAtLabel->setText(lv);
 
-    if (host=="") host = "localhost";
-    if (user=="") user = "rhUser";
-    if (pw=="") pw = "waterloo";
-    if (dbase=="") dbase = "AccompanyResources";
+
 
     db = QSqlDatabase::addDatabase("QMYSQL");
 
     db.setHostName(host);
-    db.setDatabaseName(dbase);
+    db.setDatabaseName(dBase);
     db.setUserName(user);
     db.setPassword(pw);
 
@@ -306,7 +337,7 @@ void MainWindow::getLocations()
 
    while(query.next())
    {
-      if (query.value(0).toInt() == 0)
+      if (query.value(0).toInt() == 1)
       {
          ui->sofa1CheckBox->setChecked(false);
       }
@@ -324,7 +355,7 @@ void MainWindow::getLocations()
 
    while(query.next())
    {
-      if (query.value(0).toInt() == 0)
+      if (query.value(0).toInt() == 1)
       {
          ui->sofa2CheckBox->setChecked(false);
       }
@@ -342,7 +373,7 @@ void MainWindow::getLocations()
 
    while(query.next())
    {
-      if (query.value(0).toInt() == 0)
+      if (query.value(0).toInt() == 1)
       {
          ui->sofa3CheckBox->setChecked(false);
       }
@@ -351,6 +382,44 @@ void MainWindow::getLocations()
          ui->sofa3CheckBox->setChecked(true);
       }
    }
+
+
+   locQuery = "SELECT value from Sensors where sensorId = 18 LIMIT 1";
+   query.clear();
+   query = locQuery;
+
+   query.exec();
+
+   while(query.next())
+   {
+      if (query.value(0).toInt() == 1)
+      {
+         ui->sofa4CheckBox->setChecked(false);
+      }
+      else
+      {
+         ui->sofa4CheckBox->setChecked(true);
+      }
+   }
+
+   locQuery = "SELECT value from Sensors where sensorId = 19 LIMIT 1";
+   query.clear();
+   query = locQuery;
+
+   query.exec();
+
+   while(query.next())
+   {
+      if (query.value(0).toInt() == 1)
+      {
+         ui->sofa5CheckBox->setChecked(false);
+      }
+      else
+      {
+         ui->sofa5CheckBox->setChecked(true);
+      }
+   }
+
 
    locQuery = "SELECT value from Sensors where sensorId = 500 LIMIT 1";
 
@@ -394,6 +463,24 @@ void MainWindow::getLocations()
       if (query.value(0).toInt() == 0)
       {
          ui->fridgeCheckBox->setChecked(true);
+      }
+      else
+      {
+         ui->fridgeCheckBox->setChecked(false);
+      }
+   }
+
+   locQuery = "SELECT status from Sensors where sensorId = 49 LIMIT 1";
+
+   query = locQuery;
+
+   query.exec();
+
+   while(query.next())
+   {
+       if (query.value(0).toString() == "On")
+      {
+         ui->TVCheckBox->setChecked(true);
       }
       else
       {
@@ -480,13 +567,14 @@ void MainWindow::on_sofa1CheckBox_toggled(bool checked)
 {
    if (firstTime) return;
 
-   QString stat = "Free";
+   QString stat = "Occupied";
    if (checked)
    {
-      stat = "Occupied";
+      stat = "Free";
    }
 
-   updateSensorLog(15, checked, stat);
+
+   updateSensorLog(15, !checked, stat);
 }
 
 void MainWindow::on_fridgeCheckBox_toggled(bool checked)
@@ -520,26 +608,26 @@ void MainWindow::on_sofa2CheckBox_toggled(bool checked)
 {
     if (firstTime) return;
 
-    QString stat = "Free";
+    QString stat = "Occupied";
     if (checked)
     {
-       stat = "Occupied";
+       stat = "Free";
     }
 
-    updateSensorLog(16, checked, stat);
+    updateSensorLog(16, !checked, stat);
 }
 
 void MainWindow::on_sofa3CheckBox_toggled(bool checked)
 {
     if (firstTime) return;
 
-    QString stat = "Free";
+    QString stat = "Occupied";
     if (checked)
     {
-       stat = "Occupied";
+       stat = "Free";
     }
 
-    updateSensorLog(17, checked, stat);
+    updateSensorLog(17, !checked, stat);
 }
 
 
@@ -600,3 +688,41 @@ void MainWindow::on_userLocationComboBox_currentIndexChanged(QString locn)
 }
 
 
+void MainWindow::on_sofa4CheckBox_clicked(bool checked)
+{
+    if (firstTime) return;
+
+    QString stat = "Occupied";
+    if (checked)
+    {
+       stat = "Free";
+    }
+
+    updateSensorLog(18, !checked, stat);
+}
+
+void MainWindow::on_sofa5CheckBox_clicked(bool checked)
+{
+    if (firstTime) return;
+
+    QString stat = "Occupied";
+    if (checked)
+    {
+       stat = "Free";
+    }
+
+    updateSensorLog(19, !checked, stat);
+}
+
+void MainWindow::on_TVCheckBox_clicked(bool checked)
+{
+    if (firstTime) return;
+
+    QString stat = "Off";
+    if (checked)
+    {
+       stat = "On";
+    }
+
+    updateSensorLog(49, checked, stat);
+}

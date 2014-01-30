@@ -40,6 +40,9 @@ private slots:
     void on_sofa1CheckBox_toggled(bool checked);
     void on_pushButton_2_clicked();
     void on_cupCheckBox_clicked(bool checked);
+    void on_sofa4CheckBox_clicked(bool checked);
+    void on_sofa5CheckBox_clicked(bool checked);
+    void on_TVCheckBox_clicked(bool checked);
 };
 
 #endif // MAINWINDOW_H

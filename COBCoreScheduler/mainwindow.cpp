@@ -28,6 +28,7 @@ using namespace std;
 #define ACTIONGOALS_DB_ERROR_UPDATE 6
 #define SCRIPTSERVER_EXECUTION_FAILURE 7
 #define SENSORS_DB_ERROR_UPDATE 8
+#define BEHAVIOUR_NOT_EXECUTABLE 9
 
 
 std::string modulePath = "../UHCore/Core";
@@ -153,67 +154,84 @@ MainWindow::MainWindow(int argc, char** argv, QWidget *parent) :
 
     logTableRow = -1;
 
-    QString host, user, pw, dbase;
+    QString host, user, pw, dBase;
 
     closeDownRequest = false;
 
     bool ok;
 
-    user = QInputDialog::getText(this, "Accompany DB", "User:", QLineEdit::Normal, "", &ok);
-    if (!ok)
+    QFile file("../UHCore/Core/config.py");
+
+    if (!file.exists())
+    {
+       qDebug()<<"No config.py found!!";
+    }
+
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
     {
         closeDownRequest = true;
         return;
     }
 
-    pw = QInputDialog::getText(this, "Accompany DB", "Password:", QLineEdit::Password, "", &ok);
-    if (!ok)
+    QTextStream in(&file);
+    while (!in.atEnd())
     {
-        closeDownRequest = true;
-        return;
+       QString line = in.readLine();
+
+       if (line.contains("mysql_log_user"))
+       {
+          user = line.section("'",3,3);
+       }
+       if (line.contains("mysql_log_password"))
+       {
+           pw = line.section("'",3,3);
+       }
+       if (line.contains("mysql_log_server"))
+       {
+          host = line.section("'",3,3);
+       }
+       if (line.contains("mysql_log_db"))
+       {
+          dBase = line.section("'",3,3);
+       }
     }
 
-    host = QInputDialog::getText(this, "Accompany DB", "Host:", QLineEdit::Normal, "", &ok);
+    user = QInputDialog::getText ( this, "Accompany DB", "User:",QLineEdit::Normal,
+                                     user, &ok);
     if (!ok)
     {
-        closeDownRequest = true;
-        return;
+       closeDownRequest = true;
+       return;
+    }
+
+    pw = QInputDialog::getText ( this, "Accompany DB", "Password:", QLineEdit::Password,
+                                                                      pw, &ok);
+    if (!ok)
+    {
+       closeDownRequest = true;
+       return;
+    }
+
+
+    host = QInputDialog::getText ( this, "Accompany DB", "Host:",QLineEdit::Normal,
+                                     host, &ok);
+    if (!ok)
+    {
+      closeDownRequest = true;
+      return;
     };
 
-    dbase = QInputDialog::getText(this, "Database name", "Database:", QLineEdit::Normal, "", &ok);
+    dBase = QInputDialog::getText ( this, "Accompany DB", "Database:",QLineEdit::Normal,
+                                     dBase, &ok);
     if (!ok)
     {
-        closeDownRequest = true;
-        return;
+      closeDownRequest = true;
+      return;
     };
 
-    if (lv == "ZUYD")
-    {
-        if (host == "")
-            host = "accompany1";
-        if (user == "")
-            user = "accompanyUser";
-        if (pw == "")
-            pw = "accompany";
-        if (dbase =="")
-            dbase = "Accompany";
+    ui->userlabel->setText(lv + ":" + user + ":" + host + ":" + dBase);
 
-    }
-    else
-    {
-        if (host == "")
-            host = "localhost";
-        if (user == "")
-            user = "rhUser";
-        if (pw == "")
-            pw = "waterloo";
-        if (dbase =="")
-            dbase = "AccompanyResources";
-    }
-
-    ui->userlabel->setText(lv + ":" + user + ":" + host + ":" + dbase);
-
-    if (!openAllDatabaseConnections(host, user, pw, dbase))
+    if (!openAllDatabaseConnections(host, user, pw, dBase))
     {
         closeDownRequest = true;
         return;
@@ -568,8 +586,24 @@ void MainWindow::on_sequenceTableWidget_cellClicked(int row, int column)
         nrow++;
     }
 
-    ui->evaluatePushButton->setEnabled(true);
-    ui->executePushButton->setEnabled(true);
+    if (ui->startSchedulerPushButton->isEnabled())
+    {
+        ui->evaluatePushButton->setEnabled(true);
+        ui->executePushButton->setEnabled(true);
+    }
+    else
+    {
+        if (ui->showNonSchedcheckBox->isChecked())
+        {
+            ui->evaluatePushButton->setEnabled(true);
+            ui->executePushButton->setEnabled(true);
+        }
+        else
+        {
+          ui->evaluatePushButton->setEnabled(false);
+          ui->executePushButton->setEnabled(false);
+        }
+    }
 }
 
 void MainWindow::on_evaluateAllPushButton_clicked()
@@ -591,7 +625,7 @@ void MainWindow::on_evaluateAllPushButton_clicked()
 
         if (overallresult)
         {
-            overallresult = overallresult && evaluateResources(sequenceName);
+        //    overallresult = overallresult && evaluateResources(sequenceName);
             if (!overallresult)
             {
                 ui->sequenceTableWidget->setItem(i, 3, new QTableWidgetItem("No"));
@@ -887,9 +921,21 @@ void MainWindow::on_executePushButton_clicked()
 //   {
 //      robot->stop();
 //   }
+
+
+
     QString sequenceName = ui->sequenceTableWidget->item(ui->sequenceTableWidget->currentRow(), 0)->text();
-    runSequence(sequenceName, 0, "No", ui->sequenceTableWidget->currentRow());
-    //executionResult = executeSequence(sequenceName, true);
+
+    executionResult = 0;
+
+    if (evaluateRules(sequenceName, false))
+    {
+         runSequence(sequenceName, 0, "No", ui->sequenceTableWidget->currentRow());
+    }
+    else
+    {
+       executionResult = BEHAVIOUR_NOT_EXECUTABLE;
+    }
     checkExecutionResult();
 }
 
@@ -1099,7 +1145,7 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
                 || cname == "arm")
         {
             // resource lock
-
+            /*
             qDebug()<<"    Setting resource lock for:" << cname << " " << sequenceName << " " << rname << " " << houseLocation;
 
             QSqlQuery resourceQuery(db7);
@@ -1122,6 +1168,8 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
             }
 
             db7.database().commit();
+
+            */
 
             // logic for base is: send x,y,theta from db location, if theta spec'ed by user use that
             // if go to user (999) send string "userLocation" and let the context system sort it out.
@@ -1254,7 +1302,7 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
             }
 
             // clear resource lock
-
+            /*
             qDebug()<<"    Clearing resource lock for:" << cname << " " << sequenceName << " " << rname << " " << houseLocation;
 
             resourceQuery.clear();
@@ -1272,7 +1320,7 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
                 qDebug()<<"Delete failed " << resourceQuery.lastQuery() << " " << resourceQuery.lastError();
             }
             db7.database().commit();
-
+            */
         }
 
         // -----------
@@ -1568,7 +1616,7 @@ void MainWindow::doSchedulerWork()
 
         if (result)
         {
-            result = result && evaluateResources(sequenceName);
+    //        result = result && evaluateResources(sequenceName);
             if (!result)
             {
                 ui->sequenceTableWidget->setItem(i, 3, new QTableWidgetItem("No"));
@@ -1748,6 +1796,15 @@ void MainWindow::checkExecutionResult()
         msgBox.setText("DB error - cannot update Sensors table!");
         msgBox.exec();
         break;
+
+
+    case BEHAVIOUR_NOT_EXECUTABLE:
+        msgBox.setIcon(QMessageBox::Warning);
+        msgBox.setText("That behaviour is not currently executable!");
+        msgBox.exec();
+        break;
+
+
     }
 }
 void MainWindow::on_showNonSchedcheckBox_toggled(bool checked)

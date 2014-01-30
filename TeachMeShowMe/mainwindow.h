@@ -117,6 +117,8 @@ private slots:
     void on_teachMePushButton_clicked();
 
 
+    void on_repeatFinishedPushButton_clicked();
+    void on_repeatLearnItPushButton_clicked();
 };
 
 #endif // MAINWINDOW_H
