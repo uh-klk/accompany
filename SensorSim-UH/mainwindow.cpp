@@ -470,6 +470,24 @@ void MainWindow::getLocations()
       }
    }
 
+   locQuery = "SELECT status from Sensors where sensorId = 49 LIMIT 1";
+
+   query = locQuery;
+
+   query.exec();
+
+   while(query.next())
+   {
+       if (query.value(0).toString() == "On")
+      {
+         ui->TVCheckBox->setChecked(true);
+      }
+      else
+      {
+         ui->fridgeCheckBox->setChecked(false);
+      }
+   }
+
    firstTime = false;
 }
 
@@ -694,4 +712,17 @@ void MainWindow::on_sofa5CheckBox_clicked(bool checked)
     }
 
     updateSensorLog(19, !checked, stat);
+}
+
+void MainWindow::on_TVCheckBox_clicked(bool checked)
+{
+    if (firstTime) return;
+
+    QString stat = "Off";
+    if (checked)
+    {
+       stat = "On";
+    }
+
+    updateSensorLog(49, checked, stat);
 }
