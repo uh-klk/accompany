@@ -32,7 +32,7 @@ private:
     void fillFinalView();
     void createGOTOsequence(QString seq);
     void addActionRulesRow(QString sequenceName, QString ruleText, QString actionText, int ruleCount, QString ruleActionFlag);
-    void addSequenceRow(QString sequenceName, QString scenText, int ruleCount, int priority);
+    void addSequenceRow(QString sequenceName, QString scenText, int ruleCount, int priority, int scheduled);
     void deleteExistingBehaviour(QString name);
     QString createResetCondition(QString seq);
     void generateForWithinSQL(QString command, QString cmd, QString sql, QString& actionText );

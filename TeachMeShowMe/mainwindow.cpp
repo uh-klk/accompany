@@ -2252,7 +2252,7 @@ void MainWindow::on_finalRememberPushButton_clicked()
 
     addActionRulesRow("reset-" + sequenceName,"SET ::" + sId + "::" + sequenceName + " TO true", "cond,0," + sId + ",true" ,2,"A");
 
-    addSequenceRow   ("reset-" + sequenceName, "Reset condition " + sequenceName, 1, 80);
+    addSequenceRow   ("reset-" + sequenceName, "Reset condition " + sequenceName, 1, 80, 1);
 
 
 
@@ -2336,7 +2336,7 @@ void MainWindow::on_finalRememberPushButton_clicked()
 
     // Add a row to the sequences table
 
-    addSequenceRow(ui->behNameComboBox->currentText(), ui->behNameLineEdit->text(),ruleCount++,30);
+    addSequenceRow(ui->behNameComboBox->currentText(), ui->behNameLineEdit->text(),ruleCount++,30,1);
 
     ui->allDonePushButton->show();
 
@@ -2434,11 +2434,11 @@ void MainWindow::createGOTOsequence(QString seq)
      addActionRulesRow(seq, txt, act, 2, "A");
 
      addActionRulesRow(seq, "Turn light on " + defaultRobot + " to yellow", "light," + defaultRobot.section("::",1,1) +",yellow", 3, "A");
-     addSequenceRow(seq, "Send the robot to the " + seq.section("goto",1,1) + ", lowering tray if possible (" + seq + ")" ,4,30);
+     addSequenceRow(seq, "Send the robot to the " + seq.section("goto",1,1) + ", lowering tray if possible (" + seq + ")" ,4,30,0);
 }
 
 
-void MainWindow::addSequenceRow(QString sequenceName, QString scenText, int ruleCount, int priority)
+void MainWindow::addSequenceRow(QString sequenceName, QString scenText, int ruleCount, int priority, int scheduled)
 {
     // Add a row to the sequences table
     qDebug()<<"Sequence added:: " << sequenceName<<" "<< scenText;
@@ -2449,7 +2449,7 @@ void MainWindow::addSequenceRow(QString sequenceName, QString scenText, int rule
     query.bindValue(":name",sequenceName);
     query.bindValue(":priority",priority);                                 // default for user generated behaviours
     query.bindValue(":inter",1);                                     // always interuptable
-    query.bindValue(":sched",1);                                     // always schedulable
+    query.bindValue(":sched",scheduled);                                     // wkether schedulable
     query.bindValue(":ruleCount",ruleCount);
     query.bindValue(":actionCount",0);
     query.bindValue(":exec",0);
