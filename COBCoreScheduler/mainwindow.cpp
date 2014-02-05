@@ -965,17 +965,17 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
 
     int returnResult = NO_PROBLEMS;
 
-//#    bool overallresult = evaluateRules(sequenceName, display);
-//#    qDebug() << indentSpaces + "               Evaluated " << sequenceName << " result " << overallresult;
+    bool overallresult = evaluateRules(sequenceName, display);
+    qDebug() << indentSpaces + "               Evaluated " << sequenceName << " result " << overallresult;
 
 
     // no longer executable!
-//#    if (!overallresult)
-//#    {
-    //qDebug()<<indentSpaces + "               " + sequenceName << " not executable anymore!";
-    //returnResult = RULES_INVALID;
-//#        return returnResult;
-//#    }
+    if (!overallresult)
+    {
+      qDebug()<<indentSpaces + "               " + sequenceName << " not executable anymore!";
+      returnResult = RULES_INVALID;
+      return returnResult;
+    }
 
     // get the set of actions for this sequence
     QSqlQuery query(db1);
