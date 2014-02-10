@@ -194,7 +194,7 @@ background-color: rgb(255, 0, 0);
      <bool>false</bool>
     </property>
     <property name="currentIndex">
-     <number>11</number>
+     <number>2</number>
     </property>
     <widget class="QWidget" name="tab">
      <attribute name="title">
@@ -4878,7 +4878,7 @@ color: rgb(0, 0, 0);</string>
      <x>0</x>
      <y>0</y>
      <width>1129</width>
-     <height>29</height>
+     <height>27</height>
     </rect>
    </property>
   </widget>
