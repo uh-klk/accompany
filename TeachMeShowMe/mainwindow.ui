@@ -2126,7 +2126,7 @@ color: rgb(0, 0, 0);</string>
      <rect>
       <x>680</x>
       <y>0</y>
-      <width>251</width>
+      <width>211</width>
       <height>41</height>
      </rect>
     </property>
@@ -2152,7 +2152,7 @@ color: rgb(0, 0, 0);</string>
      <rect>
       <x>680</x>
       <y>0</y>
-      <width>251</width>
+      <width>211</width>
       <height>41</height>
      </rect>
     </property>
@@ -4869,6 +4869,32 @@ color: rgb(0, 0, 0);</string>
     </property>
     <property name="text">
      <string>--&gt;</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="changePushButton">
+    <property name="geometry">
+     <rect>
+      <x>900</x>
+      <y>0</y>
+      <width>221</width>
+      <height>41</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>Sans Serif</family>
+      <pointsize>14</pointsize>
+      <weight>50</weight>
+      <italic>false</italic>
+      <bold>false</bold>
+     </font>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">color: rgb(0, 0, 0);
+background-color: rgb(0, 255, 0);</string>
+    </property>
+    <property name="text">
+     <string>Make me change this?</string>
     </property>
    </widget>
   </widget>
