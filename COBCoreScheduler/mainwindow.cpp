@@ -60,6 +60,8 @@ int currentlyExecutingPriority;
 QString currentlyExecutingCanInterrupt;
 int currentlyExecutingRow;
 
+QString displayedSequencename;
+
 int executionResult;
 
 // for script server
@@ -297,6 +299,8 @@ MainWindow::MainWindow(int argc, char** argv, QWidget *parent) :
 
     ui->showNonSchedcheckBox->setChecked(false);
 
+    displayedSequencename = "";
+
     // fill with sequences
 
     //sequences = new QSqlQueryModel();
@@ -513,6 +517,7 @@ void MainWindow::on_sequenceTableWidget_cellClicked(int row, int column)
 {
     column=column;
 
+
     QString sequenceName = ui->sequenceTableWidget->item(row, 0)->text();
     QSqlQuery query(db2);
     QString qry =
@@ -604,6 +609,8 @@ void MainWindow::on_sequenceTableWidget_cellClicked(int row, int column)
           ui->executePushButton->setEnabled(false);
         }
     }
+
+    displayedSequencename = sequenceName;
 }
 
 void MainWindow::on_evaluateAllPushButton_clicked()
@@ -620,8 +627,18 @@ void MainWindow::on_evaluateAllPushButton_clicked()
         QString res;
 
         qDebug()<<"Evaluating " << sequenceName;
+        qDebug()<<"Selected " << displayedSequencename;
 
-        bool overallresult = evaluateRules(sequenceName, false);
+        bool overallresult;
+
+        if (sequenceName == displayedSequencename)
+        {
+           evaluateRules(sequenceName, true);       // this updates the select sequence window as well
+        }
+        else
+        {
+            evaluateRules(sequenceName, false);
+        }
 
         if (overallresult)
         {
@@ -1608,7 +1625,15 @@ void MainWindow::doSchedulerWork()
 
         qDebug() << "Evaluating: " << sequenceName;
 
-        result = evaluateRules(sequenceName, false);
+        if (sequenceName == displayedSequencename)
+        {
+           result = evaluateRules(sequenceName, true);       // this updates the select sequence window as well
+        }
+        else
+        {
+            result =evaluateRules(sequenceName, false);
+        }
+
 
         if (result)
         {
