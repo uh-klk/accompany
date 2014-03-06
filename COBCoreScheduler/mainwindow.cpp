@@ -633,11 +633,11 @@ void MainWindow::on_evaluateAllPushButton_clicked()
 
         if (sequenceName == displayedSequencename)
         {
-           evaluateRules(sequenceName, true);       // this updates the select sequence window as well
+           overallresult = evaluateRules(sequenceName, true);       // this updates the select sequence window as well
         }
         else
         {
-            evaluateRules(sequenceName, false);
+            overallresult = evaluateRules(sequenceName, false);
         }
 
         if (overallresult)
