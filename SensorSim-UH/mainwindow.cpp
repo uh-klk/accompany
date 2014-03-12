@@ -441,7 +441,7 @@ void MainWindow::getLocations()
 
 
 
-   locQuery = "SELECT value from Sensors where sensorId = 307 LIMIT 1";
+   locQuery = "SELECT value from Sensors where sensorId = 60 LIMIT 1";
 
    query = locQuery;
 
@@ -655,7 +655,7 @@ void MainWindow::on_cupCheckBox_clicked(bool checked)
        stat = "Full";
     }
 
-    updateSensorLog(307, checked, stat);
+    updateSensorLog(60, checked, stat);
 
 }
 
