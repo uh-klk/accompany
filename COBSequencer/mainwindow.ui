@@ -450,7 +450,7 @@
       </rect>
      </property>
      <property name="currentIndex">
-      <number>7</number>
+      <number>5</number>
      </property>
      <widget class="QWidget" name="tabDining">
       <attribute name="title">
@@ -3295,7 +3295,7 @@
      </widget>
      <widget class="QWidget" name="hallTab">
       <attribute name="title">
-       <string>Hall</string>
+       <string>Other</string>
       </attribute>
       <widget class="QGroupBox" name="groupBox_66">
        <property name="geometry">
@@ -3303,7 +3303,7 @@
          <x>10</x>
          <y>90</y>
          <width>591</width>
-         <height>31</height>
+         <height>41</height>
         </rect>
        </property>
        <property name="title">
@@ -3361,28 +3361,148 @@
          </property>
         </widget>
        </widget>
-       <widget class="QSpinBox" name="doorbellSpinBox">
+       <widget class="QGroupBox" name="groupBox_107">
         <property name="geometry">
          <rect>
-          <x>260</x>
+          <x>140</x>
           <y>0</y>
-          <width>58</width>
+          <width>121</width>
           <height>31</height>
          </rect>
         </property>
+        <property name="title">
+         <string/>
+        </property>
+        <widget class="QRadioButton" name="UHDoorbellOnRadioButton">
+         <property name="geometry">
+          <rect>
+           <x>10</x>
+           <y>10</y>
+           <width>61</width>
+           <height>21</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>On</string>
+         </property>
+        </widget>
+        <widget class="QRadioButton" name="UHDoorbellOffRadioButton">
+         <property name="geometry">
+          <rect>
+           <x>60</x>
+           <y>10</y>
+           <width>61</width>
+           <height>21</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>Off</string>
+         </property>
+        </widget>
        </widget>
-       <widget class="QLabel" name="label_13">
+      </widget>
+      <widget class="QGroupBox" name="groupBox_104">
+       <property name="geometry">
+        <rect>
+         <x>10</x>
+         <y>140</y>
+         <width>591</width>
+         <height>31</height>
+        </rect>
+       </property>
+       <property name="title">
+        <string/>
+       </property>
+       <widget class="QCheckBox" name="UHcupLevelCheckBox">
         <property name="geometry">
          <rect>
-          <x>160</x>
+          <x>10</x>
           <y>10</y>
-          <width>101</width>
-          <height>16</height>
+          <width>121</width>
+          <height>23</height>
          </rect>
         </property>
         <property name="text">
-         <string>Wattage&gt;</string>
+         <string>Cup</string>
         </property>
+       </widget>
+       <widget class="QGroupBox" name="groupBox_105">
+        <property name="geometry">
+         <rect>
+          <x>450</x>
+          <y>10</y>
+          <width>121</width>
+          <height>21</height>
+         </rect>
+        </property>
+        <property name="title">
+         <string/>
+        </property>
+        <widget class="QRadioButton" name="UHcupLevelANDRadioButton">
+         <property name="geometry">
+          <rect>
+           <x>10</x>
+           <y>0</y>
+           <width>61</width>
+           <height>21</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>And</string>
+         </property>
+        </widget>
+        <widget class="QRadioButton" name="UHcupLevelORRadioButton">
+         <property name="geometry">
+          <rect>
+           <x>70</x>
+           <y>0</y>
+           <width>61</width>
+           <height>21</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>Or</string>
+         </property>
+        </widget>
+       </widget>
+       <widget class="QGroupBox" name="groupBox_106">
+        <property name="geometry">
+         <rect>
+          <x>140</x>
+          <y>0</y>
+          <width>161</width>
+          <height>31</height>
+         </rect>
+        </property>
+        <property name="title">
+         <string/>
+        </property>
+        <widget class="QRadioButton" name="UHCupFullRadioButton">
+         <property name="geometry">
+          <rect>
+           <x>10</x>
+           <y>10</y>
+           <width>61</width>
+           <height>21</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>Full</string>
+         </property>
+        </widget>
+        <widget class="QRadioButton" name="UHCupEmptyRadioButton">
+         <property name="geometry">
+          <rect>
+           <x>70</x>
+           <y>10</y>
+           <width>81</width>
+           <height>21</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>Empty</string>
+         </property>
+        </widget>
        </widget>
       </widget>
      </widget>
