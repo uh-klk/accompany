@@ -1311,9 +1311,9 @@ void MainWindow::on_addRuleButton_clicked()
 
            fillRuleActionTable("Fridge Freezer",
                                50,
-                               "Wattage",
+                               "open:closed",
                                ui->fridgeCheckBox->isChecked(),
-                               ui->fridgeSpinBox->value(),
+                               ui->FridgeOpenRadioButton->isChecked(),
                                ui->fridgeANDRadioButton->isChecked(),
                                ui->fridgeORRadioButton->isChecked());
 
@@ -2716,7 +2716,8 @@ void MainWindow::on_cookerCheckBox_toggled(bool checked)
 
 void MainWindow::on_fridgeCheckBox_toggled(bool checked)
 {
-    ui->fridgeSpinBox->setEnabled(checked);
+    ui->FridgeOpenRadioButton->setEnabled(checked);
+    ui->FridgeClosedRadioButton->setEnabled(checked);
     ui->fridgeANDRadioButton->setEnabled(checked);
     ui->fridgeORRadioButton->setEnabled(checked);
 
@@ -3322,7 +3323,12 @@ void MainWindow::resetGui()
     ui->toasterANDRadioButton->setChecked(true);
     ui->toasterORRadioButton->setEnabled(false);
 
-    ui->fridgeSpinBox->setEnabled(false);
+
+    ui->FridgeOpenRadioButton->setEnabled(false);
+    ui->FridgeOpenRadioButton->setChecked(false);
+    ui->FridgeClosedRadioButton->setChecked(true);
+    ui->FridgeClosedRadioButton->setEnabled(false);
+
     ui->fridgeANDRadioButton->setEnabled(false);
     ui->fridgeANDRadioButton->setChecked(true);
     ui->fridgeORRadioButton->setEnabled(false);
