@@ -418,7 +418,7 @@ bool MainWindow::fillSequenceTable(QString scenario)
             "SELECT name, priority, IF(interruptable,'Yes','No')FROM Sequences WHERE schedulable = 1 and experimentalLocationId = "\
                 + houseLocation + " AND (scenario = 'User Generated' OR scenario = 'Operator' OR scenario = '"\
                 + scenario + "') ORDER BY schedulable DESC, priority DESC, RAND()";
-        qDebug()<<qry;
+  //      qDebug()<<qry;
         if (!query.exec(qry))
         {
             QMessageBox msgBox;
@@ -492,10 +492,12 @@ void MainWindow::on_evaluatePushButton_clicked()
 
     logMessage(msg);
 
-    ui->sequenceTableWidget->setCurrentCell(-1, -1);
-    ui->evaluatePushButton->setEnabled(false);
-    ui->executePushButton->setEnabled(false);
+ //   ui->sequenceTableWidget->setCurrentCell(-1, -1);
+ //   ui->evaluatePushButton->setEnabled(false);
+ //   ui->executePushButton->setEnabled(false);
 }
+
+
 
 void MainWindow::logMessage(QString msg)
 {
@@ -595,6 +597,7 @@ void MainWindow::on_sequenceTableWidget_cellClicked(int row, int column)
     {
         ui->evaluatePushButton->setEnabled(true);
         ui->executePushButton->setEnabled(true);
+        on_evaluatePushButton_clicked();
     }
     else
     {
@@ -602,6 +605,7 @@ void MainWindow::on_sequenceTableWidget_cellClicked(int row, int column)
         {
             ui->evaluatePushButton->setEnabled(true);
             ui->executePushButton->setEnabled(true);
+            on_evaluatePushButton_clicked();
         }
         else
         {
@@ -626,8 +630,8 @@ void MainWindow::on_evaluateAllPushButton_clicked()
 
         QString res;
 
-        qDebug()<<"Evaluating " << sequenceName;
-        qDebug()<<"Selected " << displayedSequencename;
+    //    qDebug()<<"Evaluating " << sequenceName;
+    //    qDebug()<<"Selected " << displayedSequencename;
 
         bool overallresult;
 
@@ -667,7 +671,7 @@ void MainWindow::on_evaluateAllPushButton_clicked()
 
 // logging...
 
-        QString msg = "Evaluated sequence: " + sequenceName + res;
+        QString msg = " sequence: " + sequenceName + res;
 
         logMessage(msg);
 
