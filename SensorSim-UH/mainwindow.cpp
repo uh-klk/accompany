@@ -147,11 +147,27 @@ void MainWindow::setup()
     if (query.next())
     {
        activeUser = query.value(5).toString();
-       experimentLocation = query.value(5).toInt();
+       experimentLocation = query.value(6).toInt();
 
     }
 
-    activeRobot = 0;
+    QString expL;
+    expL.setNum(experimentLocation);
+
+    QString qry = "SELECT activeRobot FROM ExperimentalLocation WHERE id =";
+    qry += expL;
+
+    query.clear();
+    query = qry;
+
+    query.exec();
+
+    if (query.next())
+    {
+       activeRobot = query.value(0).toInt();
+    }
+
+    qDebug()<<qry;
 
     getLocations();
 //    QCoreApplication app(argc, argv);
@@ -246,7 +262,11 @@ void MainWindow::getLocations()
 
    // robot
 
-   locQuery = "SELECT locationId FROM Robot where robotId = 0 LIMIT 1";
+   QString actR;
+   actR.setNum(activeRobot);
+
+   locQuery = "SELECT locationId FROM Robot where robotId = ";
+   locQuery += actR + " LIMIT 1";
 
    query = locQuery;
 
@@ -421,7 +441,7 @@ void MainWindow::getLocations()
    }
 
 
-   locQuery = "SELECT value from Sensors where sensorId = 500 LIMIT 1";
+   locQuery = "SELECT status from Sensors where sensorId = 500 LIMIT 1";
 
    query = locQuery;
 
@@ -438,6 +458,27 @@ void MainWindow::getLocations()
          ui->trayCheckBox->setChecked(false);
       }
    }
+
+
+
+   locQuery = "SELECT value from Sensors where sensorId = 501 LIMIT 1";
+
+   query = locQuery;
+
+   query.exec();
+
+   while(query.next())
+   {
+      if (query.value(0).toString() == "Raised")
+      {
+         ui->trayStatusCheckBox->setChecked(true);
+      }
+      else
+      {
+         ui->trayStatusCheckBox->setChecked(false);
+      }
+   }
+
 
 
 
@@ -536,6 +577,25 @@ void MainWindow::updateSensorLog(int sensor, int value, QString stat)
           query.bindValue(":value",value);
 
         }
+
+        if (sensor == 501)                     // becasue 501is a predicate sensor and takes text values, but ui returns bool
+        {
+           if (value == 0)
+           {
+              query.bindValue(":value","Lowered");
+           }
+           else
+           {
+              query.bindValue(":value","Raised");
+           }
+        }
+        else
+        {
+          query.bindValue(":value",value);
+
+        }
+
+
 
         query.bindValue(":status",stat);
 
@@ -662,11 +722,17 @@ void MainWindow::on_cupCheckBox_clicked(bool checked)
 
 void MainWindow::on_robotLocationComboBox_currentIndexChanged(QString locn)
 {
+     if (firstTime) return;
 
       QString loc;
       loc = locn.section("::",1,1);
       QString qry;
-      qry = "UPDATE Robot SET locationId = " +  loc + " where robotId = 0";
+      QString actR;
+      actR.setNum(activeRobot);
+      qry = "UPDATE Robot SET locationId = ";
+      qry += loc + " where robotId = " +  actR;
+
+      qDebug()<<qry;
 
       QSqlQuery query(qry);
 
@@ -725,4 +791,17 @@ void MainWindow::on_TVCheckBox_clicked(bool checked)
     }
 
     updateSensorLog(49, checked, stat);
+}
+
+void MainWindow::on_trayStatusCheckBox_clicked(bool checked)
+{
+    if (firstTime) return;
+
+    QString stat = "Lowered";
+    if (checked)
+    {
+       stat = "Raised";
+    }
+
+    updateSensorLog(501, checked, stat);
 }

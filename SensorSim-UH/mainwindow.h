@@ -43,6 +43,7 @@ private slots:
     void on_sofa4CheckBox_clicked(bool checked);
     void on_sofa5CheckBox_clicked(bool checked);
     void on_TVCheckBox_clicked(bool checked);
+    void on_trayStatusCheckBox_clicked(bool checked);
 };
 
 #endif // MAINWINDOW_H
