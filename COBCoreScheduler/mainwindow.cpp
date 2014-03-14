@@ -1146,6 +1146,14 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
                 checkStopExecution();
                 robot->sleep(t);
             }
+            else
+            {
+                int n = pname.toInt();
+
+                n*= 1000000;
+                qDebug()<<n<<" "<<pname;
+                usleep(n);
+            }
 
             qDebug() << indentSpaces + "               Sleep for " << pname << " seconds";
             returnResult = NO_PROBLEMS;
@@ -1627,7 +1635,7 @@ void MainWindow::doSchedulerWork()
 
         ui->sequenceTableWidget->item(i, 0)->setBackgroundColor(Qt::yellow);
 
-        qDebug() << "Evaluating: " << sequenceName;
+   //     qDebug() << "Evaluating: " << sequenceName;
 
         if (sequenceName == displayedSequencename)
         {
