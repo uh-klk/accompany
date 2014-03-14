@@ -386,6 +386,19 @@ void MainWindow::on_robotLocationSpecButton_clicked()
         ui->robotLocationComboBox->addItem( "::" + query.value(0).toString() + ":: " + query.value(3).toString() + q1 + q2 );
     }
 
+
+    QString qry = "SELECT activeRobot FROM ExperimentalLocation where id = ";
+    qry += experimentLocation + " LIMIT 1";
+
+    query.prepare(qry);
+
+    query.exec();
+
+    while(query.next())
+    {
+        activeRobot = query.value(0).toInt();
+    }
+
     query.clear();
 
     query.prepare("SELECT robotId, robotName FROM Robot");
@@ -394,12 +407,17 @@ void MainWindow::on_robotLocationSpecButton_clicked()
 
     ui->robotLocationRobotComboBox->clear();
 
+    int current = 0;
     while(query.next())
     {
         ui->robotLocationRobotComboBox->addItem("::"+ query.value(0).toString() + "::" + query.value(1).toString());
-        ui->robotLocationRobotComboBox->setCurrentIndex(3);
+        if (query.value(0).toInt() != activeRobot)
+        {
+           current++;
+        }
     }
 
+    ui->robotLocationRobotComboBox->setCurrentIndex(current);
 
 }
 
