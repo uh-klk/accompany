@@ -1329,7 +1329,7 @@ void MainWindow::on_addRuleButton_clicked()
 
            fillRuleActionTable("Fridge Freezer",
                                50,
-                               "open:closed",
+                               "On:Off",
                                ui->fridgeCheckBox->isChecked(),
                                ui->FridgeOpenRadioButton->isChecked(),
                                ui->fridgeANDRadioButton->isChecked(),
