@@ -1021,6 +1021,8 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
         QString str = query.value(0).toString();
         qDebug() << indentSpaces + "               " + str;
 
+        QString outcome = "";
+
         cname = str.section(',', 0, 0);
         rname = str.section(',', 1, 1);
         pname = str.section(',', 2, 2);
@@ -1223,16 +1225,47 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
                         {
                             checkStopExecution();
                             returnRes = robot->setComponentState(cname.toStdString(), "userLocation", blocking);
+                            outcome = QString::fromStdString(returnRes);
                         }
 
                         qDebug() << indentSpaces + "               Set " << cname << " to " << pname << " " << wait;
 
-                        if (returnRes != "SUCCEEDED")
+                        if (outcome != "SUCCEEDED")
                         {
-                            QString r = returnRes.c_str();
-                            qDebug() << indentSpaces + "               " << r;
-                            returnResult = SCRIPTSERVER_EXECUTION_FAILURE;
+                            qDebug() << indentSpaces + "               " << outcome;
+
                             qDebug()<<"Problem with navigation to user location";
+
+                             QString msg = "Failure in userlocation ";
+                             msg = msg + cname + " " + outcome + " " + " - rerun?";
+
+                             QByteArray byteArray = msg.toUtf8();
+                             const char* cString = byteArray.constData();
+
+                             int ret = QMessageBox::warning(this, tr("Care-O-Bot Scheduler"),
+                                                               tr(cString),
+                                                               QMessageBox::No | QMessageBox::Yes);
+
+                             if (ret == QMessageBox::Yes)
+                             {
+                                returnRes = robot->setComponentState(cname.toStdString(), pname.toStdString(), blocking);
+                                outcome = QString::fromStdString(returnRes);
+
+                                if (outcome != "SUCCEEDED")
+                                {
+                                    qDebug()<<"Problem with base to user location - giving up!";
+                                    returnResult = SCRIPTSERVER_EXECUTION_FAILURE;
+                                }
+                                else
+                                {
+                                   returnResult = NO_PROBLEMS;
+                                }
+                            }
+
+                        }
+                        else
+                        {
+                           returnResult = NO_PROBLEMS;
                         }
                     }
                     else
@@ -1266,14 +1299,51 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
                             qDebug() << pos[1];
                             qDebug() << pos[2];
                             returnRes = robot->setComponentState(cname.toStdString(), pos, blocking);
+                            outcome = QString::fromStdString(returnRes);
                         }
 
-                        if (returnRes != "SUCCEEDED")
+                        if (outcome != "SUCCEEDED")
                         {
-                            QString r = returnRes.c_str();
-                            qDebug() << indentSpaces + "               " << r;
-                            returnResult = SCRIPTSERVER_EXECUTION_FAILURE;
+                            qDebug() << indentSpaces + "               " << outcome;
+
                             qDebug()<<"Problem with navigation to location";
+
+                            QString msg;
+                            msg = "Failure in navigation ";
+                            msg += " ";
+                            msg += outcome;
+                            msg += " ";
+                            msg += " - rerun?";
+
+                            QByteArray byteArray = msg.toUtf8();
+                            const char* cString = byteArray.constData();
+
+                      //      QString qString2 = QString::fromUtf8(cString);
+
+
+
+                            int ret = QMessageBox::warning(this, tr("Care-O-Bot Scheduler"),
+                                                           tr(cString),
+                                                           QMessageBox::No | QMessageBox::Yes);
+
+                            if (ret == QMessageBox::Yes)
+                            {
+                                returnRes = robot->setComponentState(cname.toStdString(), pos, blocking);
+                                outcome = QString::fromStdString(returnRes);
+                                if (outcome != "SUCCEEDED")
+                                {
+                                    qDebug()<<"Problem with navigation to location - giving up!";
+                                    returnResult = SCRIPTSERVER_EXECUTION_FAILURE;
+                                }
+                                else
+                                {
+                                    returnResult = NO_PROBLEMS;
+                                }
+                            }
+                            else
+                            {
+                                returnResult = SCRIPTSERVER_EXECUTION_FAILURE;
+                            }
                         }
                         else
                         {
@@ -1309,16 +1379,48 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
                 {
                     checkStopExecution();
                     returnRes = robot->setComponentState(cname.toStdString(), pname.toStdString(), blocking);
+                    outcome = QString::fromStdString(returnRes);
                 }
 
                 qDebug() << indentSpaces + "               Set " << cname << " to " << pname << " " << wait;
 
-                if (returnRes != "SUCCEEDED")
+                if (outcome != "SUCCEEDED")
                 {
-                    QString r = returnRes.c_str();
-                    qDebug() << indentSpaces + "               " << r;
-                    returnResult = SCRIPTSERVER_EXECUTION_FAILURE;
-                    qDebug()<<"Problem with " << cname;;
+
+                    qDebug() << indentSpaces + "               " << outcome;
+
+                    qDebug()<<"Problem with " << cname;
+
+                    QString msg = "Failure in ";
+                    msg = msg + cname + " " + outcome + " " + " - rerun?";
+
+                    QByteArray byteArray = msg.toUtf8();
+                    const char* cString = byteArray.constData();
+
+                    int ret = QMessageBox::warning(this, tr("Care-O-Bot Scheduler"),
+                                                   tr(cString),
+                                                   QMessageBox::No | QMessageBox::Yes);
+
+                    if (ret == QMessageBox::Yes)
+                    {
+                        returnRes = robot->setComponentState(cname.toStdString(), pname.toStdString(), blocking);
+                        outcome = QString::fromStdString(returnRes);
+
+                        if (outcome != "SUCCEEDED")
+                        {
+                            qDebug()<<"Problem with component - giving up!";
+                            returnResult = SCRIPTSERVER_EXECUTION_FAILURE;
+                        }
+                        else
+                        {
+                            returnResult = NO_PROBLEMS;
+                        }
+                    }
+                    else
+                    {
+                        returnResult = SCRIPTSERVER_EXECUTION_FAILURE;
+                    }
+
                 }
                 else
                 {
