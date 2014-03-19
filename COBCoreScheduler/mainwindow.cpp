@@ -1689,7 +1689,7 @@ void MainWindow::doSchedulerWork()
     {
         stopSequence(currentlyExecutingSequence);
         checkExecutionResult();
-        QApplication::quit();
+ //       QApplication::quit();    joe
     }
 
 //    logMessage("Evaluating sequence list...");
