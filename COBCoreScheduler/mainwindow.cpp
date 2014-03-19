@@ -121,6 +121,9 @@ MainWindow::MainWindow(int argc, char** argv, QWidget *parent) :
     uiLink = ui;
     mainW = this;
 
+
+    QMessageBox msgBox;
+
     ui->logTableWidget->clear();
     ui->logTableWidget->verticalHeader()->setVisible(false);
     ui->logTableWidget->horizontalHeader()->setVisible(false);
@@ -968,8 +971,30 @@ void MainWindow::checkStopExecution()
     }
 }
 
+int MainWindow::retryMessage(QString msg )
+{
+    QByteArray byteArray = msg.toUtf8();
+    const char* cString = byteArray.constData();
+
+    int ret = QMessageBox::warning(ui->centralWidget, tr("Care-O-Bot Scheduler"),
+                                   tr(cString),
+                                   QMessageBox::No | QMessageBox::Yes);
+
+    if (ret == QMessageBox::Yes)
+    {
+        return 1;
+    }
+    else
+    {
+        return 0;
+    }
+
+}
+
+
 int MainWindow::executeSequence(QString sequenceName, bool display)
 {
+
     display=display;
 
     qDebug() << "=========================================================== " << rc++;;
@@ -1230,38 +1255,27 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
 
                         qDebug() << indentSpaces + "               Set " << cname << " to " << pname << " " << wait;
 
-                        if (outcome != "SUCCEEDED")
+                        if (outcome != "SUCCEEDED" && runWithROS)
                         {
                             qDebug() << indentSpaces + "               " << outcome;
 
-                            qDebug()<<"Problem with navigation to user location";
+                             QString msg = "Failure in userlocation navigation ";
+                             msg = msg + cname + " " + outcome + " " + " - retrying...";
 
-                             QString msg = "Failure in userlocation ";
-                             msg = msg + cname + " " + outcome + " " + " - rerun?";
+                             qDebug()<<msg;
 
-                             QByteArray byteArray = msg.toUtf8();
-                             const char* cString = byteArray.constData();
+                             returnRes = robot->setComponentState(cname.toStdString(), pname.toStdString(), blocking);
+                             outcome = QString::fromStdString(returnRes);
 
-                             int ret = QMessageBox::warning(this, tr("Care-O-Bot Scheduler"),
-                                                               tr(cString),
-                                                               QMessageBox::No | QMessageBox::Yes);
-
-                             if (ret == QMessageBox::Yes)
+                             if (outcome != "SUCCEEDED")
                              {
-                                returnRes = robot->setComponentState(cname.toStdString(), pname.toStdString(), blocking);
-                                outcome = QString::fromStdString(returnRes);
-
-                                if (outcome != "SUCCEEDED")
-                                {
-                                    qDebug()<<"Problem with base to user location - giving up!";
-                                    returnResult = SCRIPTSERVER_EXECUTION_FAILURE;
-                                }
-                                else
-                                {
-                                   returnResult = NO_PROBLEMS;
-                                }
-                            }
-
+                                qDebug()<<"Problem with base to user location - giving up!";
+                                returnResult = SCRIPTSERVER_EXECUTION_FAILURE;
+                             }
+                             else
+                             {
+                                returnResult = NO_PROBLEMS;
+                             }
                         }
                         else
                         {
@@ -1302,60 +1316,38 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
                             outcome = QString::fromStdString(returnRes);
                         }
 
-                        if (outcome != "SUCCEEDED")
+                        if (outcome != "SUCCEEDED" && runWithROS)
                         {
                             qDebug() << indentSpaces + "               " << outcome;
 
-                            qDebug()<<"Problem with navigation to location";
-
                             QString msg;
-                            msg = "Failure in navigation ";
+                            msg = "Failure in navigation to location ";
                             msg += " ";
                             msg += outcome;
                             msg += " ";
-                            msg += " - rerun?";
+                            msg += " - retrying...";
 
-                            QByteArray byteArray = msg.toUtf8();
-                            const char* cString = byteArray.constData();
+                            qDebug()<<msg;
 
-                      //      QString qString2 = QString::fromUtf8(cString);
+                            returnRes = robot->setComponentState(cname.toStdString(), pos, blocking);
+                            outcome = QString::fromStdString(returnRes);
 
-
-
-                            int ret = QMessageBox::warning(this, tr("Care-O-Bot Scheduler"),
-                                                           tr(cString),
-                                                           QMessageBox::No | QMessageBox::Yes);
-
-                            if (ret == QMessageBox::Yes)
+                            if (outcome != "SUCCEEDED")
                             {
-                                returnRes = robot->setComponentState(cname.toStdString(), pos, blocking);
-                                outcome = QString::fromStdString(returnRes);
-                                if (outcome != "SUCCEEDED")
-                                {
                                     qDebug()<<"Problem with navigation to location - giving up!";
                                     returnResult = SCRIPTSERVER_EXECUTION_FAILURE;
-                                }
-                                else
-                                {
-                                    returnResult = NO_PROBLEMS;
-                                }
                             }
                             else
                             {
-                                returnResult = SCRIPTSERVER_EXECUTION_FAILURE;
+                               returnResult = NO_PROBLEMS;
                             }
-                        }
-                        else
-                        {
+                         }
+                         else
+                         {
                             returnResult = NO_PROBLEMS;
-                        }
-
-
-
+                         }
                     }
                 }
-
-
             }
 
             // differences between cob 3,2 and cob 3.5/6
@@ -1384,43 +1376,28 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
 
                 qDebug() << indentSpaces + "               Set " << cname << " to " << pname << " " << wait;
 
-                if (outcome != "SUCCEEDED")
+                if (outcome != "SUCCEEDED" && runWithROS)
                 {
 
                     qDebug() << indentSpaces + "               " << outcome;
 
-                    qDebug()<<"Problem with " << cname;
-
                     QString msg = "Failure in ";
-                    msg = msg + cname + " " + outcome + " " + " - rerun?";
+                    msg = msg + cname + " " + outcome + " Retrying";
 
-                    QByteArray byteArray = msg.toUtf8();
-                    const char* cString = byteArray.constData();
+                    qDebug()<<msg;
 
-                    int ret = QMessageBox::warning(this, tr("Care-O-Bot Scheduler"),
-                                                   tr(cString),
-                                                   QMessageBox::No | QMessageBox::Yes);
+                    returnRes = robot->setComponentState(cname.toStdString(), pname.toStdString(), blocking);
+                    outcome = QString::fromStdString(returnRes);
 
-                    if (ret == QMessageBox::Yes)
+                    if (outcome != "SUCCEEDED")
                     {
-                        returnRes = robot->setComponentState(cname.toStdString(), pname.toStdString(), blocking);
-                        outcome = QString::fromStdString(returnRes);
-
-                        if (outcome != "SUCCEEDED")
-                        {
-                            qDebug()<<"Problem with component - giving up!";
-                            returnResult = SCRIPTSERVER_EXECUTION_FAILURE;
-                        }
-                        else
-                        {
-                            returnResult = NO_PROBLEMS;
-                        }
+                       qDebug()<<"Problem with component - giving up!";
+                       returnResult = SCRIPTSERVER_EXECUTION_FAILURE;
                     }
                     else
                     {
-                        returnResult = SCRIPTSERVER_EXECUTION_FAILURE;
+                        returnResult = NO_PROBLEMS;
                     }
-
                 }
                 else
                 {

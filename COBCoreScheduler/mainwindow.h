@@ -37,6 +37,7 @@ public:
 	void planNavigation(QString destination);
 	int sendScriptServerMsg();
 	void updateGUI(int option);
+    int  retryMessage(QString msg);
 
 protected:
 	void changeEvent(QEvent *e);
