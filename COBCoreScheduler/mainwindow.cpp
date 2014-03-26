@@ -1019,8 +1019,9 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
     if (!overallresult)
     {
       qDebug()<<indentSpaces + "               " + sequenceName << " not executable anymore!";
-      returnResult = RULES_INVALID;
-      return returnResult;
+   //   returnResult = RULES_INVALID;
+        return NO_PROBLEMS;
+
     }
 
     // get the set of actions for this sequence
@@ -1178,7 +1179,7 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
                 int n = pname.toInt();
 
                 n*= 1000000;
-                qDebug()<<n<<" "<<pname;
+         //       qDebug()<<n<<" "<<pname;
                 usleep(n);
             }
 

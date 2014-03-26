@@ -37,7 +37,7 @@ public:
 	void planNavigation(QString destination);
 	int sendScriptServerMsg();
 	void updateGUI(int option);
-    int  retryMessage(QString msg);
+
 
 protected:
 	void changeEvent(QEvent *e);
@@ -47,6 +47,9 @@ private:
 	QTimer timer;
 	QTimer schedTimer;
 	void checkStopExecution();
+
+public slots:
+    int  retryMessage(QString msg);
 
 private slots:
 	void on_executePushButton_clicked();
