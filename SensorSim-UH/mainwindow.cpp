@@ -501,6 +501,7 @@ void MainWindow::getLocations()
 
    while(query.next())
    {
+   //    qDebug()<<query.value(0).toInt();
       if (query.value(0).toInt() == 0)
       {
          ui->fridgeCheckBox->setChecked(true);
@@ -525,7 +526,7 @@ void MainWindow::getLocations()
       }
       else
       {
-         ui->fridgeCheckBox->setChecked(false);
+         ui->TVCheckBox->setChecked(false);
       }
    }
 
@@ -641,10 +642,10 @@ void MainWindow::on_fridgeCheckBox_toggled(bool checked)
 {
     if (firstTime) return;
 
-    QString stat = "Open";
+    QString stat = "On";
     if (checked)
     {
-       stat = "Closed";
+       stat = "Off";
     }
 
     updateSensorLog(50, !checked, stat);
