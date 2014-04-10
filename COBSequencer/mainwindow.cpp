@@ -386,9 +386,10 @@ void MainWindow::on_robotLocationSpecButton_clicked()
         ui->robotLocationComboBox->addItem( "::" + query.value(0).toString() + ":: " + query.value(3).toString() + q1 + q2 );
     }
 
-
+    QString expLoc;
+    expLoc.setNum(experimentLocation);
     QString qry = "SELECT activeRobot FROM ExperimentalLocation where id = ";
-    qry += experimentLocation + " LIMIT 1";
+    qry += expLoc + " LIMIT 1";
 
     query.prepare(qry);
 
