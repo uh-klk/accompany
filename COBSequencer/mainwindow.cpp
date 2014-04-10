@@ -386,9 +386,10 @@ void MainWindow::on_robotLocationSpecButton_clicked()
         ui->robotLocationComboBox->addItem( "::" + query.value(0).toString() + ":: " + query.value(3).toString() + q1 + q2 );
     }
 
-
+    QString expLoc;
+    expLoc.setNum(experimentLocation);
     QString qry = "SELECT activeRobot FROM ExperimentalLocation where id = ";
-    qry += experimentLocation + " LIMIT 1";
+    qry += expLoc + " LIMIT 1";
 
     query.prepare(qry);
 
@@ -408,6 +409,7 @@ void MainWindow::on_robotLocationSpecButton_clicked()
     ui->robotLocationRobotComboBox->clear();
 
     int current = 0;
+    int actual = 0;
     while(query.next())
     {
         ui->robotLocationRobotComboBox->addItem("::"+ query.value(0).toString() + "::" + query.value(1).toString());
@@ -415,9 +417,14 @@ void MainWindow::on_robotLocationSpecButton_clicked()
         {
            current++;
         }
+        else
+        {
+           actual=current;
+        }
+
     }
 
-    ui->robotLocationRobotComboBox->setCurrentIndex(current);
+    ui->robotLocationRobotComboBox->setCurrentIndex(actual);
 
 }
 
@@ -3524,8 +3531,11 @@ void MainWindow::resetGui()
 
      query.clear();
 
+     QString expLoc;
+     expLoc.setNum(experimentLocation);
+
      QString qry = "SELECT activeRobot FROM ExperimentalLocation where id = ";
-     qry += experimentLocation + " LIMIT 1";
+     qry += expLoc + " LIMIT 1";
 
      query.prepare(qry);
 
@@ -3544,16 +3554,22 @@ void MainWindow::resetGui()
 
      ui->robotComboBox->clear();
      int current = 0;
+     int actual = 0;
      while(query.next())
      {
          ui->robotComboBox->addItem("::"+ query.value(0).toString() + "::" + query.value(1).toString());
+
          if (query.value(0).toInt() != activeRobot)
          {
             current++;
          }
+         else
+         {
+            actual=current;
+         }
      }
 
-     ui->robotComboBox->setCurrentIndex(current);
+     ui->robotComboBox->setCurrentIndex(actual);
      ui->trayRaiseRadioButton->setChecked(false);
      ui->trayLowerRadioButton->setChecked(true);
      ui->robotTrayGroupBox->setEnabled(false);
