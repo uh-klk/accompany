@@ -269,6 +269,7 @@ void MainWindow::initialiseGUI()
 
        ui->addPushButton->hide();
        ui->deletePushButton->hide();
+       ui->changePushButton->hide();
 
        //learnedModel = new QStringListModel();
 
@@ -365,6 +366,7 @@ void MainWindow::on_startLearningPushButton_clicked()
      ui->behNameLineEdit->setEnabled(false);
 
      ui->deletePushButton->hide();
+     ui->changePushButton->hide();
      ui->addPushButton->hide();
 
      ui->startLearningPushButton->hide();
@@ -490,6 +492,7 @@ void MainWindow::on_behNameComboBox_editTextChanged(QString )
     ui->addPushButton->show();
 
     ui->deletePushButton->hide();
+    ui->changePushButton->hide();
 //    qDebug()<<"edit";
 }
 
@@ -500,6 +503,7 @@ void MainWindow::on_behNameComboBox_activated(QString behName)
      ui->addPushButton->hide();
 
      ui->deletePushButton->show();
+     ui->changePushButton->show();
 
      QSqlQuery query;
      query.prepare("SELECT * FROM Sequences WHERE name = :name AND experimentalLocationId = :locn");
@@ -859,6 +863,7 @@ void MainWindow::on_speakLearnItPushButton_clicked()
    QString str = ui->speakLineEdit->text();
    str = str.simplified();
    str.replace( " ", "" );
+   str.replace( ",", " " );
 
    if (ui->speakKnowHowListView->currentIndex().row() == -1 && str=="")
    {
@@ -872,7 +877,7 @@ void MainWindow::on_speakLearnItPushButton_clicked()
     }
 
     QString learntItem;
-    str = ui->speakLineEdit->text();
+ //   str = ui->speakLineEdit->text();
 
     if (str != "")
     {
@@ -2223,7 +2228,7 @@ void MainWindow::on_finalRememberPushButton_clicked()
 
     // add the rule cehcking the condition
 
-    addActionRulesRow(sequenceName,sId + sequenceName + " is true", "SELECT * FROM Sensors WHERE sensorId = " + sId + " AND value = 'true'" ,ruleCount,"R");
+    addActionRulesRow(sequenceName,"Auto:" + sId + sequenceName + " is true", "SELECT * FROM Sensors WHERE sensorId = " + sId + " AND value = 'true'" ,ruleCount,"R");
 
     ruleCount++;
 
@@ -2252,7 +2257,7 @@ void MainWindow::on_finalRememberPushButton_clicked()
 
     addActionRulesRow("reset-" + sequenceName,"SET ::" + sId + "::" + sequenceName + " TO true", "cond,0," + sId + ",true" ,2,"A");
 
-    addSequenceRow   ("reset-" + sequenceName, "Reset condition " + sequenceName, 1, 80);
+    addSequenceRow   ("reset-" + sequenceName, "Reset condition " + sequenceName, 1, 80, 1);
 
 
 
@@ -2270,10 +2275,11 @@ void MainWindow::on_finalRememberPushButton_clicked()
           QString actionText;
           QString command;
 
+          ruletext = cmd;
 
           if (cmd.left(3) == "say")
           {
-              ruletext = defaultRobot + " says '" + cmd.mid(4).remove('"') + "' and wait for completion";
+          //    ruletext = defaultRobot + " says '" + cmd.mid(4).remove('"') + "' and wait for completion";
               actionText = "speak," + defaultRobot.section("::",1,1) + "," + cmd.mid(4).remove('"') + ",,wait";
           }
           else
@@ -2299,7 +2305,7 @@ void MainWindow::on_finalRememberPushButton_clicked()
 
             if (query.size() > 0)         // found
             {
-                ruletext = cmd;
+            //    ruletext = cmd;
              //   ruletext = "Execute sequence '" + command + "' on " + defaultRobot;
                 actionText = "sequence," + defaultRobot.section("::",1,1) + "," + command;
             }
@@ -2308,7 +2314,7 @@ void MainWindow::on_finalRememberPushButton_clicked()
               if (command.left(4) == "goto")    // need to create entirely new sequence
               {
                    createGOTOsequence(command);
-                   ruletext = cmd;
+              //     ruletext = cmd;
                //    ruletext = "Execute sequence '" + command + "' on " + defaultRobot;
                    actionText = "sequence," + defaultRobot.section("::",1,1) + "," + command;
 
@@ -2330,13 +2336,13 @@ void MainWindow::on_finalRememberPushButton_clicked()
 
     // turn the reset condition off
 
-    addActionRulesRow(sequenceName,"SET ::" + sId + "::" + sequenceName + " TO false", "cond,0," + sId + ",false" ,ruleCount,"A");
+    addActionRulesRow(sequenceName,"Auto: SET ::" + sId + "::" + sequenceName + " TO false", "cond,0," + sId + ",false" ,ruleCount,"A");
 
     ruleCount++;
 
     // Add a row to the sequences table
 
-    addSequenceRow(ui->behNameComboBox->currentText(), ui->behNameLineEdit->text(),ruleCount++,30);
+    addSequenceRow(ui->behNameComboBox->currentText(), ui->behNameLineEdit->text(),ruleCount++,30,1);
 
     ui->allDonePushButton->show();
 
@@ -2434,11 +2440,11 @@ void MainWindow::createGOTOsequence(QString seq)
      addActionRulesRow(seq, txt, act, 2, "A");
 
      addActionRulesRow(seq, "Turn light on " + defaultRobot + " to yellow", "light," + defaultRobot.section("::",1,1) +",yellow", 3, "A");
-     addSequenceRow(seq, "Send the robot to the " + seq.section("goto",1,1) + ", lowering tray if possible (" + seq + ")" ,4,30);
+     addSequenceRow(seq, "Send the robot to the " + seq.section("goto",1,1) + ", lowering tray if possible (" + seq + ")" ,4,30,0);
 }
 
 
-void MainWindow::addSequenceRow(QString sequenceName, QString scenText, int ruleCount, int priority)
+void MainWindow::addSequenceRow(QString sequenceName, QString scenText, int ruleCount, int priority, int scheduled)
 {
     // Add a row to the sequences table
     qDebug()<<"Sequence added:: " << sequenceName<<" "<< scenText;
@@ -2449,7 +2455,7 @@ void MainWindow::addSequenceRow(QString sequenceName, QString scenText, int rule
     query.bindValue(":name",sequenceName);
     query.bindValue(":priority",priority);                                 // default for user generated behaviours
     query.bindValue(":inter",1);                                     // always interuptable
-    query.bindValue(":sched",1);                                     // always schedulable
+    query.bindValue(":sched",scheduled);                                     // wkether schedulable
     query.bindValue(":ruleCount",ruleCount);
     query.bindValue(":actionCount",0);
     query.bindValue(":exec",0);
@@ -2947,5 +2953,28 @@ void MainWindow::on_repeatLearnItPushButton_clicked()
 
 
 
+
+}
+
+void MainWindow::on_changePushButton_clicked()
+{
+
+    QSqlQuery query;
+    query.prepare("SELECT ruleActiontext FROM ActionRules WHERE name = :name AND experimentalLocationId = :locn");
+    query.bindValue(":name",ui->behNameComboBox->currentText());
+    query.bindValue(":locn", expLocation);
+
+    query.exec();
+
+    while (query.next())
+    {
+        if (!query.value(0).toString().contains("Auto:"))
+        {
+          ui->learnedSoFarListWidget->addItem(query.value(0).toString());
+        }
+    }
+
+    on_startLearningPushButton_clicked();
+ //   fillFinalView();
 
 }

@@ -60,6 +60,8 @@ int currentlyExecutingPriority;
 QString currentlyExecutingCanInterrupt;
 int currentlyExecutingRow;
 
+QString displayedSequencename;
+
 int executionResult;
 
 // for script server
@@ -118,6 +120,9 @@ MainWindow::MainWindow(int argc, char** argv, QWidget *parent) :
 
     uiLink = ui;
     mainW = this;
+
+
+    QMessageBox msgBox;
 
     ui->logTableWidget->clear();
     ui->logTableWidget->verticalHeader()->setVisible(false);
@@ -297,6 +302,8 @@ MainWindow::MainWindow(int argc, char** argv, QWidget *parent) :
 
     ui->showNonSchedcheckBox->setChecked(false);
 
+    displayedSequencename = "";
+
     // fill with sequences
 
     //sequences = new QSqlQueryModel();
@@ -414,7 +421,7 @@ bool MainWindow::fillSequenceTable(QString scenario)
             "SELECT name, priority, IF(interruptable,'Yes','No')FROM Sequences WHERE schedulable = 1 and experimentalLocationId = "\
                 + houseLocation + " AND (scenario = 'User Generated' OR scenario = 'Operator' OR scenario = '"\
                 + scenario + "') ORDER BY schedulable DESC, priority DESC, RAND()";
-        qDebug()<<qry;
+  //      qDebug()<<qry;
         if (!query.exec(qry))
         {
             QMessageBox msgBox;
@@ -488,10 +495,12 @@ void MainWindow::on_evaluatePushButton_clicked()
 
     logMessage(msg);
 
-    ui->sequenceTableWidget->setCurrentCell(-1, -1);
-    ui->evaluatePushButton->setEnabled(false);
-    ui->executePushButton->setEnabled(false);
+ //   ui->sequenceTableWidget->setCurrentCell(-1, -1);
+ //   ui->evaluatePushButton->setEnabled(false);
+ //   ui->executePushButton->setEnabled(false);
 }
+
+
 
 void MainWindow::logMessage(QString msg)
 {
@@ -512,6 +521,7 @@ void MainWindow::on_sequenceTableWidget_cellDoubleClicked(int row, int column)
 void MainWindow::on_sequenceTableWidget_cellClicked(int row, int column)
 {
     column=column;
+
 
     QString sequenceName = ui->sequenceTableWidget->item(row, 0)->text();
     QSqlQuery query(db2);
@@ -590,6 +600,7 @@ void MainWindow::on_sequenceTableWidget_cellClicked(int row, int column)
     {
         ui->evaluatePushButton->setEnabled(true);
         ui->executePushButton->setEnabled(true);
+        on_evaluatePushButton_clicked();
     }
     else
     {
@@ -597,6 +608,7 @@ void MainWindow::on_sequenceTableWidget_cellClicked(int row, int column)
         {
             ui->evaluatePushButton->setEnabled(true);
             ui->executePushButton->setEnabled(true);
+            on_evaluatePushButton_clicked();
         }
         else
         {
@@ -604,6 +616,8 @@ void MainWindow::on_sequenceTableWidget_cellClicked(int row, int column)
           ui->executePushButton->setEnabled(false);
         }
     }
+
+    displayedSequencename = sequenceName;
 }
 
 void MainWindow::on_evaluateAllPushButton_clicked()
@@ -619,9 +633,19 @@ void MainWindow::on_evaluateAllPushButton_clicked()
 
         QString res;
 
-        qDebug()<<"Evaluating " << sequenceName;
+    //    qDebug()<<"Evaluating " << sequenceName;
+    //    qDebug()<<"Selected " << displayedSequencename;
 
-        bool overallresult = evaluateRules(sequenceName, false);
+        bool overallresult;
+
+        if (sequenceName == displayedSequencename)
+        {
+           overallresult = evaluateRules(sequenceName, true);       // this updates the select sequence window as well
+        }
+        else
+        {
+            overallresult = evaluateRules(sequenceName, false);
+        }
 
         if (overallresult)
         {
@@ -650,7 +674,7 @@ void MainWindow::on_evaluateAllPushButton_clicked()
 
 // logging...
 
-        QString msg = "Evaluated sequence: " + sequenceName + res;
+        QString msg = " sequence: " + sequenceName + res;
 
         logMessage(msg);
 
@@ -947,8 +971,30 @@ void MainWindow::checkStopExecution()
     }
 }
 
+int MainWindow::retryMessage(QString msg )
+{
+    QByteArray byteArray = msg.toUtf8();
+    const char* cString = byteArray.constData();
+
+    int ret = QMessageBox::warning(ui->centralWidget, tr("Care-O-Bot Scheduler"),
+                                   tr(cString),
+                                   QMessageBox::No | QMessageBox::Yes);
+
+    if (ret == QMessageBox::Yes)
+    {
+        return 1;
+    }
+    else
+    {
+        return 0;
+    }
+
+}
+
+
 int MainWindow::executeSequence(QString sequenceName, bool display)
 {
+
     display=display;
 
     qDebug() << "=========================================================== " << rc++;;
@@ -965,17 +1011,18 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
 
     int returnResult = NO_PROBLEMS;
 
-//#    bool overallresult = evaluateRules(sequenceName, display);
-//#    qDebug() << indentSpaces + "               Evaluated " << sequenceName << " result " << overallresult;
+    bool overallresult = evaluateRules(sequenceName, display);
+    qDebug() << indentSpaces + "               Evaluated " << sequenceName << " result " << overallresult;
 
 
     // no longer executable!
-//#    if (!overallresult)
-//#    {
-    //qDebug()<<indentSpaces + "               " + sequenceName << " not executable anymore!";
-    //returnResult = RULES_INVALID;
-//#        return returnResult;
-//#    }
+    if (!overallresult)
+    {
+      qDebug()<<indentSpaces + "               " + sequenceName << " not executable anymore!";
+   //   returnResult = RULES_INVALID;
+        return NO_PROBLEMS;
+
+    }
 
     // get the set of actions for this sequence
     QSqlQuery query(db1);
@@ -1003,6 +1050,8 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
         // unpack query
         QString str = query.value(0).toString();
         qDebug() << indentSpaces + "               " + str;
+
+        QString outcome = "";
 
         cname = str.section(',', 0, 0);
         rname = str.section(',', 1, 1);
@@ -1129,6 +1178,14 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
                 checkStopExecution();
                 robot->sleep(t);
             }
+            else
+            {
+                int n = pname.toInt();
+
+                n*= 1000000;
+         //       qDebug()<<n<<" "<<pname;
+                usleep(n);
+            }
 
             qDebug() << indentSpaces + "               Sleep for " << pname << " seconds";
             returnResult = NO_PROBLEMS;
@@ -1198,16 +1255,36 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
                         {
                             checkStopExecution();
                             returnRes = robot->setComponentState(cname.toStdString(), "userLocation", blocking);
+                            outcome = QString::fromStdString(returnRes);
                         }
 
                         qDebug() << indentSpaces + "               Set " << cname << " to " << pname << " " << wait;
 
-                        if (returnRes != "SUCCEEDED")
+                        if (outcome != "SUCCEEDED" && runWithROS)
                         {
-                            QString r = returnRes.c_str();
-                            qDebug() << indentSpaces + "               " << r;
-                            returnResult = SCRIPTSERVER_EXECUTION_FAILURE;
-                            qDebug()<<"Problem with navigation to user location";
+                            qDebug() << indentSpaces + "               " << outcome;
+
+                             QString msg = "Failure in userlocation navigation ";
+                             msg = msg + cname + " " + outcome + " " + " - retrying...";
+
+                             qDebug()<<msg;
+
+                             returnRes = robot->setComponentState(cname.toStdString(), pname.toStdString(), blocking);
+                             outcome = QString::fromStdString(returnRes);
+
+                             if (outcome != "SUCCEEDED")
+                             {
+                                qDebug()<<"Problem with base to user location - giving up!";
+                                returnResult = SCRIPTSERVER_EXECUTION_FAILURE;
+                             }
+                             else
+                             {
+                                returnResult = NO_PROBLEMS;
+                             }
+                        }
+                        else
+                        {
+                           returnResult = NO_PROBLEMS;
                         }
                     }
                     else
@@ -1241,26 +1318,41 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
                             qDebug() << pos[1];
                             qDebug() << pos[2];
                             returnRes = robot->setComponentState(cname.toStdString(), pos, blocking);
+                            outcome = QString::fromStdString(returnRes);
                         }
 
-                        if (returnRes != "SUCCEEDED")
+                        if (outcome != "SUCCEEDED" && runWithROS)
                         {
-                            QString r = returnRes.c_str();
-                            qDebug() << indentSpaces + "               " << r;
-                            returnResult = SCRIPTSERVER_EXECUTION_FAILURE;
-                            qDebug()<<"Problem with navigation to location";
-                        }
-                        else
-                        {
+                            qDebug() << indentSpaces + "               " << outcome;
+
+                            QString msg;
+                            msg = "Failure in navigation to location ";
+                            msg += " ";
+                            msg += outcome;
+                            msg += " ";
+                            msg += " - retrying...";
+
+                            qDebug()<<msg;
+
+                            returnRes = robot->setComponentState(cname.toStdString(), pos, blocking);
+                            outcome = QString::fromStdString(returnRes);
+
+                            if (outcome != "SUCCEEDED")
+                            {
+                                    qDebug()<<"Problem with navigation to location - giving up!";
+                                    returnResult = SCRIPTSERVER_EXECUTION_FAILURE;
+                            }
+                            else
+                            {
+                               returnResult = NO_PROBLEMS;
+                            }
+                         }
+                         else
+                         {
                             returnResult = NO_PROBLEMS;
-                        }
-
-
-
+                         }
                     }
                 }
-
-
             }
 
             // differences between cob 3,2 and cob 3.5/6
@@ -1284,16 +1376,33 @@ int MainWindow::executeSequence(QString sequenceName, bool display)
                 {
                     checkStopExecution();
                     returnRes = robot->setComponentState(cname.toStdString(), pname.toStdString(), blocking);
+                    outcome = QString::fromStdString(returnRes);
                 }
 
                 qDebug() << indentSpaces + "               Set " << cname << " to " << pname << " " << wait;
 
-                if (returnRes != "SUCCEEDED")
+                if (outcome != "SUCCEEDED" && runWithROS)
                 {
-                    QString r = returnRes.c_str();
-                    qDebug() << indentSpaces + "               " << r;
-                    returnResult = SCRIPTSERVER_EXECUTION_FAILURE;
-                    qDebug()<<"Problem with " << cname;;
+
+                    qDebug() << indentSpaces + "               " << outcome;
+
+                    QString msg = "Failure in ";
+                    msg = msg + cname + " " + outcome + " Retrying";
+
+                    qDebug()<<msg;
+
+                    returnRes = robot->setComponentState(cname.toStdString(), pname.toStdString(), blocking);
+                    outcome = QString::fromStdString(returnRes);
+
+                    if (outcome != "SUCCEEDED")
+                    {
+                       qDebug()<<"Problem with component - giving up!";
+                       returnResult = SCRIPTSERVER_EXECUTION_FAILURE;
+                    }
+                    else
+                    {
+                        returnResult = NO_PROBLEMS;
+                    }
                 }
                 else
                 {
@@ -1585,7 +1694,7 @@ void MainWindow::doSchedulerWork()
     {
         stopSequence(currentlyExecutingSequence);
         checkExecutionResult();
-        QApplication::quit();
+ //       QApplication::quit();    joe
     }
 
 //    logMessage("Evaluating sequence list...");
@@ -1610,9 +1719,17 @@ void MainWindow::doSchedulerWork()
 
         ui->sequenceTableWidget->item(i, 0)->setBackgroundColor(Qt::yellow);
 
-        qDebug() << "Evaluating: " << sequenceName;
+   //     qDebug() << "Evaluating: " << sequenceName;
 
-        result = evaluateRules(sequenceName, false);
+        if (sequenceName == displayedSequencename)
+        {
+           result = evaluateRules(sequenceName, true);       // this updates the select sequence window as well
+        }
+        else
+        {
+            result =evaluateRules(sequenceName, false);
+        }
+
 
         if (result)
         {

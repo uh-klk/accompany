@@ -32,6 +32,7 @@ int andCount;
 
 int experimentLocation;   // 1 = UH, 2=ZUYD, 3=Madopa
 int defaultUserId;
+int activeRobot;
 
 
 MainWindow::MainWindow(QWidget *parent) :
@@ -175,7 +176,7 @@ void MainWindow::setup()
         QMessageBox msgBox;
         msgBox.setIcon(QMessageBox::Critical);
 
-        msgBox.setText("Can find session control table!");
+        msgBox.setText("Can't find session control table!");
         msgBox.exec();
         closeDownRequest = true;
         return;
@@ -385,6 +386,19 @@ void MainWindow::on_robotLocationSpecButton_clicked()
         ui->robotLocationComboBox->addItem( "::" + query.value(0).toString() + ":: " + query.value(3).toString() + q1 + q2 );
     }
 
+
+    QString qry = "SELECT activeRobot FROM ExperimentalLocation where id = ";
+    qry += experimentLocation + " LIMIT 1";
+
+    query.prepare(qry);
+
+    query.exec();
+
+    while(query.next())
+    {
+        activeRobot = query.value(0).toInt();
+    }
+
     query.clear();
 
     query.prepare("SELECT robotId, robotName FROM Robot");
@@ -393,12 +407,17 @@ void MainWindow::on_robotLocationSpecButton_clicked()
 
     ui->robotLocationRobotComboBox->clear();
 
+    int current = 0;
     while(query.next())
     {
         ui->robotLocationRobotComboBox->addItem("::"+ query.value(0).toString() + "::" + query.value(1).toString());
-        ui->robotLocationRobotComboBox->setCurrentIndex(3);
+        if (query.value(0).toInt() != activeRobot)
+        {
+           current++;
+        }
     }
 
+    ui->robotLocationRobotComboBox->setCurrentIndex(current);
 
 }
 
@@ -1310,9 +1329,9 @@ void MainWindow::on_addRuleButton_clicked()
 
            fillRuleActionTable("Fridge Freezer",
                                50,
-                               "Wattage",
+                               "On:Off",
                                ui->fridgeCheckBox->isChecked(),
-                               ui->fridgeSpinBox->value(),
+                               ui->FridgeOpenRadioButton->isChecked(),
                                ui->fridgeANDRadioButton->isChecked(),
                                ui->fridgeORRadioButton->isChecked());
 
@@ -1342,11 +1361,21 @@ void MainWindow::on_addRuleButton_clicked()
 
            fillRuleActionTable("Doorbell",
                                59,
-                               "Wattage",
+                               "On:Off",
                                ui->doorbellCheckBox->isChecked(),
-                               ui->doorbellSpinBox->value(),
+                               ui->UHDoorbellOnRadioButton->isChecked(),
                                ui->doorbellANDRadioButton->isChecked(),
                                ui->doorbellORRadioButton->isChecked());
+
+           fillRuleActionTable("UH Cup",
+                               60,
+                               "Full:Empty",
+                               ui->UHcupLevelCheckBox->isChecked(),
+                               ui->UHCupFullRadioButton->isChecked(),
+                               ui->UHcupLevelANDRadioButton->isChecked(),
+                               ui->UHcupLevelORRadioButton->isChecked());
+
+
 
     // ZUYD Sensors
 
@@ -2705,7 +2734,8 @@ void MainWindow::on_cookerCheckBox_toggled(bool checked)
 
 void MainWindow::on_fridgeCheckBox_toggled(bool checked)
 {
-    ui->fridgeSpinBox->setEnabled(checked);
+    ui->FridgeOpenRadioButton->setEnabled(checked);
+    ui->FridgeClosedRadioButton->setEnabled(checked);
     ui->fridgeANDRadioButton->setEnabled(checked);
     ui->fridgeORRadioButton->setEnabled(checked);
 
@@ -2770,7 +2800,9 @@ void MainWindow::on_dishwasherCheckBox_toggled(bool checked)
 
 void MainWindow::on_doorbellCheckBox_toggled(bool checked)
 {
-    ui->doorbellSpinBox->setEnabled(checked);
+    ui->UHDoorbellOnRadioButton->setChecked(true);
+    ui->UHDoorbellOnRadioButton->setEnabled(checked);
+    ui->UHDoorbellOffRadioButton->setEnabled(checked);
     ui->doorbellANDRadioButton->setEnabled(checked);
     ui->doorbellORRadioButton->setEnabled(checked);
 
@@ -3309,7 +3341,12 @@ void MainWindow::resetGui()
     ui->toasterANDRadioButton->setChecked(true);
     ui->toasterORRadioButton->setEnabled(false);
 
-    ui->fridgeSpinBox->setEnabled(false);
+
+    ui->FridgeOpenRadioButton->setEnabled(false);
+    ui->FridgeOpenRadioButton->setChecked(false);
+    ui->FridgeClosedRadioButton->setChecked(true);
+    ui->FridgeClosedRadioButton->setEnabled(false);
+
     ui->fridgeANDRadioButton->setEnabled(false);
     ui->fridgeANDRadioButton->setChecked(true);
     ui->fridgeORRadioButton->setEnabled(false);
@@ -3327,7 +3364,8 @@ void MainWindow::resetGui()
     ui->kettleANDRadioButton->setChecked(true);
     ui->kettleORRadioButton->setEnabled(false);
 
-    ui->doorbellSpinBox->setEnabled(false);
+    ui->UHDoorbellOnRadioButton->setEnabled(false);
+    ui->UHDoorbellOffRadioButton->setEnabled(false);
     ui->doorbellANDRadioButton->setEnabled(false);
     ui->doorbellANDRadioButton->setChecked(true);
     ui->doorbellORRadioButton->setEnabled(false);
@@ -3364,6 +3402,15 @@ void MainWindow::resetGui()
 
     ui->sensorActiveSpinBox->setEnabled(false);
     ui->lastActiveSpinBox->setEnabled(false);
+
+
+    ui->UHCupEmptyRadioButton->setEnabled(false);
+    ui->UHCupFullRadioButton->setEnabled(false);
+    ui->UHcupLevelANDRadioButton->setEnabled(false);
+    ui->UHcupLevelORRadioButton->setEnabled(false);
+    ui->UHcupLevelANDRadioButton->setChecked(true);
+    ui->UHCupEmptyRadioButton->setChecked(true);
+
 
     // ZUYD Sensors
 
@@ -3475,8 +3522,19 @@ void MainWindow::resetGui()
 
      ui->actionGroupBox->setEnabled(false);
 
+     query.clear();
 
+     QString qry = "SELECT activeRobot FROM ExperimentalLocation where id = ";
+     qry += experimentLocation + " LIMIT 1";
 
+     query.prepare(qry);
+
+     query.exec();
+
+     while(query.next())
+     {
+         activeRobot = query.value(0).toInt();
+     }
 
      query.clear();
 
@@ -3485,13 +3543,17 @@ void MainWindow::resetGui()
      query.exec();
 
      ui->robotComboBox->clear();
-
+     int current = 0;
      while(query.next())
      {
          ui->robotComboBox->addItem("::"+ query.value(0).toString() + "::" + query.value(1).toString());
+         if (query.value(0).toInt() != activeRobot)
+         {
+            current++;
+         }
      }
 
-     ui->robotComboBox->setCurrentIndex(3);
+     ui->robotComboBox->setCurrentIndex(current);
      ui->trayRaiseRadioButton->setChecked(false);
      ui->trayLowerRadioButton->setChecked(true);
      ui->robotTrayGroupBox->setEnabled(false);
@@ -5217,6 +5279,25 @@ void MainWindow::on_robotSaveMemoryCheckBox_toggled(bool checked)
     else
     {
         actionCount--;
+    }
+
+}
+
+void MainWindow::on_UHcupLevelCheckBox_toggled(bool checked)
+{
+
+    ui->UHCupEmptyRadioButton->setEnabled(checked);
+    ui->UHCupFullRadioButton->setEnabled(checked);
+    ui->UHcupLevelANDRadioButton->setEnabled(checked);
+    ui->UHcupLevelORRadioButton->setEnabled(checked);
+
+    if (checked)
+    {
+       ruleCount++;
+    }
+    else
+    {
+        ruleCount--;
     }
 
 }

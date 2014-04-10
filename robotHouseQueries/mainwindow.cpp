@@ -280,7 +280,7 @@ void MainWindow::updateSensors()
 
     if (lastMin)
             model->setQuery("SELECT S.sensorId, S.name, L.name'Location',TIMESTAMPDIFF(SECOND,S.lastUpdate,NOW())'seconds',\
-                            S.value,S.lastUpdate,T.sensorType,T.madeBy\
+                            S.value,S.status,S.lastUpdate,T.sensorType,T.madeBy\
                             FROM Sensors S, Locations L, SensorType T\
                             WHERE S.locationId = L.locationId\
                               AND S.sensorTypeId = T.sensorTypeId\
@@ -289,7 +289,7 @@ void MainWindow::updateSensors()
     else
 
         model->setQuery("SELECT S.sensorId, S.name, L.name'Location',TIMESTAMPDIFF(SECOND,S.lastUpdate,NOW())'seconds',\
-                        S.value,S.lastUpdate,T.sensorType,T.madeBy\
+                        S.value,S.status,S.lastUpdate,T.sensorType,T.madeBy\
                         FROM Sensors S, Locations L, SensorType T\
                         WHERE S.locationId = L.locationId\
                           AND S.sensorTypeId = T.sensorTypeId\

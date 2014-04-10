@@ -156,6 +156,19 @@
       <string>TV On/Off (On if ticked)</string>
      </property>
     </widget>
+    <widget class="QCheckBox" name="trayStatusCheckBox">
+     <property name="geometry">
+      <rect>
+       <x>270</x>
+       <y>120</y>
+       <width>411</width>
+       <height>23</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Tray Status Lowered/Raised  (Raised if ticked) </string>
+     </property>
+    </widget>
    </widget>
    <widget class="QGroupBox" name="groupBox_9">
     <property name="geometry">
