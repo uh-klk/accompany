@@ -181,7 +181,7 @@ void MainWindow::fillMessageCombo()
     QString seqQuery;
     QSqlQuery query;
 
-    seqQuery = "SELECT messageId,message FROM Accompany.Messages where languageId = " + ui->languageComboBox->currentText().section("::",1,1) + " order by messageId";
+    seqQuery = "SELECT messageId,message FROM Messages where languageId = " + ui->languageComboBox->currentText().section("::",1,1) + " order by messageId";
 
     query = seqQuery;
 
