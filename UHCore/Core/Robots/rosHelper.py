@@ -152,7 +152,16 @@ class ROS(object):
             command = ['bash', '-i', '-c', ('%s; env' % ". %s/.bashrc" % os.getenv("HOME")).strip('; ')]
             pipe = Popen(command, stdout=PIPE, stderr=PIPE)
             (data, _) = pipe.communicate()
-            env = dict((line.split("=", 1) for line in data.splitlines()))
+            env = {}
+            for line in data.splitlines():
+                try:
+                    key, value = line.split("=", 1)
+                    env[key] = value
+                except ValueError:
+                    #TODO: This happens when an environment value has a newline in it
+                    #  should fine a proper way to handle it in the future
+                    continue
+            #env = dict((line.split("=", 1) for line in data.splitlines()))
             ROS._userVars = env
         
         return ROS._userVars
