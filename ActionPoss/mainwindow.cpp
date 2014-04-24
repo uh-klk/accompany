@@ -283,13 +283,19 @@ void MainWindow::on_APCreatePushButton_clicked()
           sId = query.value(0).toInt() + 1;
     }
 
-    query.prepare("INSERT INTO ActionPossibilities VALUES (:apId, :apText, 1, null, :apPhrase, null, 0,:pred)");
+    query.prepare("INSERT INTO ActionPossibilities VALUES (:apId, :apText, 1, null, :apPhrase, null, 0,:pred,100,100)");
 
 
     query.bindValue(":apId",sId);
     query.bindValue(":apText",ui->APTextComboBox->currentText().section("::",1,1));
     query.bindValue(":apPhrase",ui->APPhraseComboBox->currentText().section("::",1,1));
     query.bindValue(":pred",ui->APPredComboBox->currentText().section("::",1,1));
+
+
+  //  qDebug() << sId;
+  //  qDebug() << ui->APTextComboBox->currentText().section("::",1,1);
+  //  qDebug() << ui->APPhraseComboBox->currentText().section("::",1,1);
+  //  qDebug() << ui->APPredComboBox->currentText().section("::",1,1);
 
   //  qDebug()<<query.executedQuery();
 
@@ -307,6 +313,10 @@ void MainWindow::on_APCreatePushButton_clicked()
         qCritical("Cannot add/update: %s (%s)",
                   db.lastError().text().toLatin1().data(),
                   qt_error_string().toLocal8Bit().data());
+
+        qDebug()<<query.lastError();
+        qDebug()<<query.executedQuery();
+
         return;
     }
 
