@@ -5529,12 +5529,12 @@
           <rect>
            <x>80</x>
            <y>10</y>
-           <width>99</width>
+           <width>121</width>
            <height>21</height>
           </rect>
          </property>
          <property name="text">
-          <string>Lower</string>
+          <string>Intermediate</string>
          </property>
         </widget>
         <widget class="QCheckBox" name="trayWaitCheckBox">
@@ -5548,6 +5548,19 @@
          </property>
          <property name="text">
           <string>Wait  </string>
+         </property>
+        </widget>
+        <widget class="QRadioButton" name="trayStoreRadioButton">
+         <property name="geometry">
+          <rect>
+           <x>210</x>
+           <y>10</y>
+           <width>101</width>
+           <height>21</height>
+          </rect>
+         </property>
+         <property name="text">
+          <string>Store</string>
          </property>
         </widget>
        </widget>

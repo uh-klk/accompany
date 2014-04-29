@@ -1960,18 +1960,27 @@ void MainWindow::on_addActionButton_clicked()
     if (ui->robotTrayCheckBox->isChecked())
     {
 
+// intermediate position added for Troyes
 
        actiontext = "move tray on " + ui->robotComboBox->currentText() + " to ";
+
 
        if (ui->trayRaiseRadioButton->isChecked())
        {
             actiontext+="Raised";
-            action = "tray," + ui->robotComboBox->currentText().section("::", 1, 1) + ",deliverup";
+            action = "tray," + ui->robotComboBox->currentText().section("::", 1, 1) + ",raised";
        }
-       else
+
+       if (ui->trayLowerRadioButton->isChecked())
        {
-             actiontext+="Lowered";
-             action = "tray," + ui->robotComboBox->currentText().section("::", 1, 1) + ",store";
+            actiontext+="Intermediate";
+            action = "tray," + ui->robotComboBox->currentText().section("::", 1, 1) + ",intermediate";
+       }
+
+       if (ui->trayStoreRadioButton->isChecked())
+       {
+             actiontext+="Stored";
+             action = "tray," + ui->robotComboBox->currentText().section("::", 1, 1) + ",lowered";
        }
 
        if (ui->trayWaitCheckBox->isChecked())
@@ -1979,6 +1988,23 @@ void MainWindow::on_addActionButton_clicked()
             actiontext+=" and wait for completion";
             action +=   ",,wait";
        }
+
+ //      if (ui->trayRaiseRadioButton->isChecked())
+ //      {
+ //           actiontext+="Raised";
+ //           action = "tray," + ui->robotComboBox->currentText().section("::", 1, 1) + ",deliverup";
+ //      }
+ //      else
+ //      {
+ //            actiontext+="Lowered";
+ //            action = "tray," + ui->robotComboBox->currentText().section("::", 1, 1) + ",store";
+ //      }
+
+ //      if (ui->trayWaitCheckBox->isChecked())
+ //      {
+ //           actiontext+=" and wait for completion";
+ //           action +=   ",,wait";
+ //      }
 
        updateActionDB("tray", sequenceName,actiontext,action);
 
@@ -3023,6 +3049,9 @@ void MainWindow::fillRuleActionTable(QString name, int Id, QString type, bool ch
           }
 
 
+
+
+
           if (ui->sensorActiveCheckBox->isChecked())
           {
              QString v1;
@@ -3046,6 +3075,16 @@ void MainWindow::fillRuleActionTable(QString name, int Id, QString type, bool ch
       query.bindValue(":actionText",action);
 
       query.bindValue(":locn",experimentLocation);
+
+      // temporary hack to handle or conditions on tray
+
+      if ( Id == 501 )
+      {
+        if (ORRadio)
+        {
+           query.bindValue(":andOrConnector",2);
+        }
+      }
 
       if (ruleCount > 1)
       {
@@ -3572,7 +3611,9 @@ void MainWindow::resetGui()
      ui->robotComboBox->setCurrentIndex(actual);
      ui->trayRaiseRadioButton->setChecked(false);
      ui->trayLowerRadioButton->setChecked(true);
+     ui->trayStoreRadioButton->setChecked(false);
      ui->robotTrayGroupBox->setEnabled(false);
+
 
      ui->TorsoGroupBox->setEnabled(false);
      ui->moveWaitGroupBox->setEnabled(false);
