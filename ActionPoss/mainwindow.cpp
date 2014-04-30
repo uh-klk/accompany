@@ -400,10 +400,10 @@ void MainWindow::on_tableWidget_itemActivated(QTableWidgetItem *item)
 
 }
 
-void MainWindow::on_tableWidget_itemSelectionChanged()
-{
-    ui->APDeletePushButton->setEnabled(false);
-}
+//void MainWindow::on_tableWidget_itemSelectionChanged()
+//{
+//    ui->APDeletePushButton->setEnabled(false);
+//}
 
 void MainWindow::on_APDeletePushButton_clicked()
 {
@@ -425,4 +425,22 @@ void MainWindow::on_APDeletePushButton_clicked()
 void MainWindow::on_APRefreshPushButton_clicked()
 {
         fillDisplayArea();
+}
+
+void MainWindow::on_tableWidget_itemPressed(QTableWidgetItem *item)
+{
+        ui->APDeletePushButton->setEnabled(true);
+        deleteCandidate = item->row();
+}
+
+void MainWindow::on_tableWidget_clicked(const QModelIndex &index)
+{
+          ui->APDeletePushButton->setEnabled(true);
+          deleteCandidate = index.row();
+}
+
+void MainWindow::on_tableWidget_doubleClicked(const QModelIndex &index)
+{
+              ui->APDeletePushButton->setEnabled(true);
+              deleteCandidate = index.row();
 }
