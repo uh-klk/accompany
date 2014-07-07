@@ -9,6 +9,11 @@
 #include <geometry_msgs/Twist.h>
 #include <geometry_msgs/Point.h>
 
+
+#include <move_base_msgs/MoveBaseAction.h>
+#include <actionlib/client/simple_action_client.h>
+
+
 #include <vector>
 
 /* MySQL Connector/C++ specific headers */
@@ -22,11 +27,65 @@
 #include <cppconn/exception.h>
 #include <cppconn/warning.h>
 
+
+ struct Pose
+  {
+    float x; //in [m]
+    float y; //in [m]
+    float orientation; //in [rad]
+
+    Pose()
+    {
+      x = 0;
+      y = 0;
+      orientation = 0;
+    }
+
+    Pose(float x_, float y_, float orientation_)
+    {
+      x = x_;
+      y = y_;
+      orientation = orientation_;
+    }
+  };
+
+ struct Bearing
+ {
+   float distance;
+   float orientation;
+
+   Bearing()
+   {
+     distance = 0.0;
+     orientation = 0.0;
+   }
+ };
+
 tf::TransformListener *ptrListener=NULL;
+
+
+typedef actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> MoveBaseClient;
+
+actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> *ptrMoveBaseClient=NULL;
+
 
 using namespace std;
 using namespace sql;
 
+float degree2radian(float degree)
+{
+  float radian;
+  float pi = 4.0 * std::atan2(1.0, 1.0);
+
+  return radian = pi * degree / 180.0;
+}
+float radian2degree(float radian)
+{
+  float degree;
+  float pi = 4.0 * std::atan2(1.0, 1.0);
+
+  return degree = 180 * radian / pi;
+}
 bool isRobotFree(void)
 {
   string sql;
@@ -81,38 +140,119 @@ bool isRobotFree(void)
 
   return status;
 }
+Pose getRobotPose()
+{
+  //Calculate robot pose in map coordinate frame
+  //    stored the robot's origin in base_link frame
+  tf::Stamped<tf::Pose> robotOrigin = tf::Stamped<tf::Pose>(tf::Pose(tf::createQuaternionFromYaw(0),
+                                                                     tf::Point(0.0, 0.0, 0.0)),
+                                                            ros::Time(0),
+                                                            "base_link"); //base_link origin is the robot coordinate frame
+  // create a PoseStamped variable to store the StampedPost TF
+  geometry_msgs::PoseStamped map_frame; // create a map_frame to store robotOrigin in map frame
+  geometry_msgs::PoseStamped base_link_frame; // create a base_link_frame to store robotOrigin in base_link frame
+  tf::poseStampedTFToMsg(robotOrigin, base_link_frame); //stored the robot coordinate in base_link frame
+  try
+  {
+    ptrListener->transformPose("map", base_link_frame, map_frame); //listen for base_link to map transform, then transform the robot coordinate to map coordinate frame
+
+    ROS_INFO("Robot coordinate in map frame: (%.2f, %.2f, %.2f)",
+             map_frame.pose.position.x, map_frame.pose.position.y, radian2degree(tf::getYaw(map_frame.pose.orientation)));
+  }
+  catch (tf::TransformException& ex)
+  {
+    ROS_ERROR("Received an exception trying to transform robot origin from \"base_link\" to \"map\": %s", ex.what());
+  }
+
+  Pose robotLocation(map_frame.pose.position.x, map_frame.pose.position.y, tf::getYaw(map_frame.pose.orientation)); // stored the current robot pose
+
+  return robotLocation;
+}
 
 
-//Calculate the angle for the robot to rotate
-//Check if robot is free / safe to move
-//moves the robot
+float calRobotRotationAngle(Pose robPose, Pose humPose)
+{
+
+   float d_y = humPose.y-robPose.y;
+   float d_x = humPose.x-robPose.x;
+   float theta_tar = atan2(d_y, d_x);
+
+   std::cout<<radian2degree(theta_tar)<<endl;
+
+   return theta_tar;
+}
+float calDistanceToHuman(Pose robPose, Pose humPose)
+ {
+
+   float d_y = humPose.y-robPose.y;
+   float d_x = humPose.x-robPose.x;
+
+  return sqrt((d_x*d_x)+(d_y*d_y));
+ }
+
+int iSeeYouSeeingMe(Pose robPose, Pose humPose)
+{
+  float deltaTheta = 0;
+  float distance = 9999;
+  move_base_msgs::MoveBaseGoal goal;
+
+  deltaTheta = calRobotRotationAngle(robPose, humPose);
+  distance = calDistanceToHuman(robPose, humPose);
+
+  cout<<"Distance = "<< distance <<", Angle = "<< radian2degree(deltaTheta) <<endl;
+
+  if ( (distance <= 3.6) && (distance >=0.5) && (( radian2degree(deltaTheta) >= 10) || (radian2degree(deltaTheta) <= -10))  && isRobotFree())
+  {
+    cout<<"I'm in here 2"<<endl;
+    //robot will move relative to its current pose
+    goal.target_pose.header.frame_id = "map";
+    goal.target_pose.header.stamp = ros::Time::now();
+    goal.target_pose.pose.position.x = robPose.x;
+    goal.target_pose.pose.position.y = robPose.y;
+    goal.target_pose.pose.position.z = 0.0;
+    goal.target_pose.pose.orientation = tf::createQuaternionMsgFromYaw( deltaTheta);
+
+    ROS_INFO("Robot orientation =  %f", radian2degree(robPose.orientation));
+    ROS_INFO("Robot delta to target = %f", radian2degree(deltaTheta) );
+
+    ptrMoveBaseClient->sendGoal(goal);
+    ptrMoveBaseClient->waitForResult();
+
+    if(ptrMoveBaseClient->getState() == actionlib::SimpleClientGoalState::SUCCEEDED)
+      ROS_INFO("Hooray, the robot reached its target.");
+    else
+      ROS_INFO("The base failed to rotate for some reason");
+  }
+
+  return 1;
+}
 
 void chatterCallback(const accompany_uva_msg::TrackedHumans::ConstPtr& msg)
 {
-  geometry_msgs::PointStamped newLocation;
-
-  ROS_INFO("\n Size of array is %d ",msg->trackedHumans.size());
+  geometry_msgs::PointStamped userPointInMap;
 
   for (int i=0; i< msg->trackedHumans.size(); ++i)
   {
-    ROS_INFO(" Special flag is %d",msg->trackedHumans[i].specialFlag);
-
-    if (msg->trackedHumans[i].specialFlag == 1)
+    if (msg->trackedHumans[i].specialFlag == 1) //specialFlag indicate the most reliable tracked person.
     {
-      ROS_INFO("Frame id is %s",msg->trackedHumans[i].location.header.frame_id.c_str());
-
-      try// transform to map coordinate system
+      try // transform to map coordinate system
       {
-        ptrListener->waitForTransform("/map",
+        bool condition =  ptrListener->waitForTransform("/map",
                                       msg->trackedHumans[i].location.header.frame_id,
-                                      ros::Time::now(),
-                                      ros::Duration(10.0));
+                                      msg->trackedHumans[i].location.header.stamp,
+                                      ros::Duration(5.0));
 
         ptrListener->transformPoint("/map",
                                 msg->trackedHumans[i].location,
-                                newLocation);
+                                userPointInMap);
 
-        ROS_INFO("Output x=%f , y=%f ",newLocation.point.x, newLocation.point.y);
+        ROS_INFO("User is at (%f, %f)",userPointInMap.point.x, userPointInMap.point.y);
+
+        Pose userPoseInMap(userPointInMap.point.x, userPointInMap.point.y, 0);
+        Pose robotPoseInMap(getRobotPose());
+
+        iSeeYouSeeingMe(robotPoseInMap,userPoseInMap);
+
       }
       catch (tf::TransformException e)
       {
@@ -127,52 +267,19 @@ void chatterCallback(const accompany_uva_msg::TrackedHumans::ConstPtr& msg)
 int main(int argc, char **argv)
 {
 
-  /**
-   * The ros::init() function needs to see argc and argv so that it can perform
-   * any ROS arguments and name remapping that were provided at the command line. For programmatic
-   * remappings you can use a different version of init() which takes remappings
-   * directly, but for most command-line programs, passing argc and argv is the easiest
-   * way to do it.  The third argument to init() is the name of the node.
-   *
-   * You must call one of the versions of ros::init() before using any other
-   * part of the ROS system.
-   */
   ros::init(argc, argv, "listener");
-
-  /**
-   * NodeHandle is the main access point to communications with the ROS system.
-   * The first NodeHandle constructed will fully initialize this node, and the last
-   * NodeHandle destructed will close down the node.
-   */
   ros::NodeHandle n;
+
   ptrListener = new tf::TransformListener();
 
-  /**
-   * The subscribe() call is how you tell ROS that you want to receive messages
-   * on a given topic.  This invokes a call to the ROS
-   * master node, which keeps a registry of who is publishing and who
-   * is subscribing.  Messages are passed to a callback function, here
-   * called chatterCallback.  subscribe() returns a Subscriber object that you
-   * must hold on to until you want to unsubscribe.  When all copies of the Subscriber
-   * object go out of scope, this callback will automatically be unsubscribed from
-   * this topic.
-   *
-   * The second parameter to the subscribe() function is the size of the message
-   * queue.  If messages are arriving faster than they are being processed, this
-   * is the number of messages that will be buffered up before beginning to throw
-   * away the oldest ones.
-   */
-  isRobotFree();
-  //ros::Subscriber sub = n.subscribe("/trackedHumans", 1000, chatterCallback);
+  ptrMoveBaseClient = new MoveBaseClient("move_base", true);
 
+  //wait for the action server to come up
+  while(!ptrMoveBaseClient->waitForServer(ros::Duration(5.0))){
+    ROS_INFO("Waiting for the move_base action server to come up");
+  }
+  ros::Subscriber sub = n.subscribe("/trackedHumans", 1, chatterCallback); // stored only the most recent
 
-
-
-  /**
-   * ros::spin() will enter a loop, pumping callbacks.  With this version, all
-   * callbacks will be called from within this thread (the main one).  ros::spin()
-   * will exit when Ctrl-C is pressed, or the node is shutdown by the master.
-   */
   ros::spin();
 
   return 0;
