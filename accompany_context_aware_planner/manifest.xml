@@ -16,6 +16,7 @@
   <depend package="opencv2"/>
   <depend package="nav_msgs"/>
   <depend package="accompany_uva_msg"/>
+  <depend package="cob_light"/>
   <depend package="move_base_msgs"/>
   <depend package="actionlib"/>
   <rosdep name="libmysqlclient-dev"/>

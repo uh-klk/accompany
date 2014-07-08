@@ -2,6 +2,9 @@
 #include "std_msgs/String.h"
 #include <accompany_uva_msg/TrackedHumans.h>
 
+//#include <cob_light/SetLightModeGoal.h>
+#include <std_msgs/ColorRGBA.h>
+
 #include <tf/transform_datatypes.h>
 #include <tf/transform_listener.h>
 
@@ -9,6 +12,8 @@
 #include <geometry_msgs/Twist.h>
 #include <geometry_msgs/Point.h>
 
+#include <cob_light/SetLightModeAction.h>
+#include <cob_light/SetLightMode.h>
 
 #include <move_base_msgs/MoveBaseAction.h>
 #include <actionlib/client/simple_action_client.h>
@@ -27,6 +32,20 @@
 #include <cppconn/exception.h>
 #include <cppconn/warning.h>
 
+tf::TransformListener *ptrListener=NULL;
+ros::Publisher *ptrVelPub=NULL;
+ros::Publisher *ptrLightPub=NULL;
+
+typedef actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> MoveBaseClient;
+actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> *ptrMoveBaseClient=NULL;
+
+typedef actionlib::SimpleActionClient<cob_light::SetLightModeAction> SetLightModeClient;
+actionlib::SimpleActionClient<cob_light::SetLightModeAction> *ptrSetLightModeClient=NULL;
+
+int light_on =0;
+
+using namespace std;
+using namespace sql;
 
  struct Pose
   {
@@ -61,16 +80,7 @@
    }
  };
 
-tf::TransformListener *ptrListener=NULL;
 
-
-typedef actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> MoveBaseClient;
-
-actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> *ptrMoveBaseClient=NULL;
-
-
-using namespace std;
-using namespace sql;
 
 float degree2radian(float degree)
 {
@@ -140,7 +150,7 @@ bool isRobotFree(void)
 
   return status;
 }
-Pose getRobotPose()
+Pose getRobotPoseInMapFrame()
 {
   //Calculate robot pose in map coordinate frame
   //    stored the robot's origin in base_link frame
@@ -190,21 +200,59 @@ float calDistanceToHuman(Pose robPose, Pose humPose)
   return sqrt((d_x*d_x)+(d_y*d_y));
  }
 
-int iSeeYouSeeingMe(Pose robPose, Pose humPose)
+int iSeeYouSeeingMe(Pose robPoseInRobotFrame, Pose humPoseInRobotFrame)
 {
   float deltaTheta = 0;
   float distance = 9999;
-  move_base_msgs::MoveBaseGoal goal;
 
-  deltaTheta = calRobotRotationAngle(robPose, humPose);
-  distance = calDistanceToHuman(robPose, humPose);
+  geometry_msgs::Twist cmd;
+
+  std_msgs::ColorRGBA blue, red, yellow, green, white;
+
+   blue.r =0;     blue.g =0;    blue.b =1;      blue.a = 1;
+   red.r =1;      red.g =0;     red.b =0;       red.a = 1;
+   green.r=0;   green.g =1;     green.b =0;     green.a=1;
+   yellow.r =0.4; yellow.g =1;  yellow.b =0;    yellow.a =1;
+   white.r =0.3;  white.g =1;   white.b =0.3;   white.a =1;
+
+  cmd.linear.x = cmd.linear.y = cmd.angular.z =0;
+
+  deltaTheta = calRobotRotationAngle(robPoseInRobotFrame, humPoseInRobotFrame);
+  distance = calDistanceToHuman(robPoseInRobotFrame, humPoseInRobotFrame);
 
   cout<<"Distance = "<< distance <<", Angle = "<< radian2degree(deltaTheta) <<endl;
-
+  //turns toward the user when the user entered the robot's social zone and he is more than 10 degree off the robot's heading and when it is safe for the robot to do so.
   if ( (distance <= 3.6) && (distance >=0.5) && (( radian2degree(deltaTheta) >= 10) || (radian2degree(deltaTheta) <= -10))  && isRobotFree())
   {
-    cout<<"I'm in here 2"<<endl;
+    cout<<"Tracking the user ..."<<endl;
+   // ptrLightPub->publish(red);
+    cmd.angular.z = 0.5*(sqrt(deltaTheta*deltaTheta)/deltaTheta);
+    //ptrVelPub->publish(cmd); //This provide a smooth tracking behaviour
+
+    cout<<cmd.angular.z<<endl;
+    ///stop for conduting study now.
+    if (light_on == 0)
+    {
+      light_on =1;
+    cob_light::SetLightModeGoal goal;
+
+    goal.mode.mode = cob_light::LightMode::FLASH;
+    goal.mode.color = red;
+    goal.mode.frequency = 1;
+   /* goal.mode.timeout = 0;
+    goal.mode.pulses = 2;
+    goal.mode.priority = 0;*/
+    ptrSetLightModeClient->sendGoal(goal);
+    ptrSetLightModeClient->waitForResult();
+
+    if(ptrSetLightModeClient->getState() == actionlib::SimpleClientGoalState::SUCCEEDED)
+      ROS_INFO("Hooray, the robot blinked.");
+    else
+      ROS_INFO("The light failed for some reason");
+    }
+/*
     //robot will move relative to its current pose
+    move_base_msgs::MoveBaseGoal goal;
     goal.target_pose.header.frame_id = "map";
     goal.target_pose.header.stamp = ros::Time::now();
     goal.target_pose.pose.position.x = robPose.x;
@@ -222,7 +270,21 @@ int iSeeYouSeeingMe(Pose robPose, Pose humPose)
       ROS_INFO("Hooray, the robot reached its target.");
     else
       ROS_INFO("The base failed to rotate for some reason");
+*/
   }
+  else
+    {
+    if (light_on == 1)
+    {
+      ptrLightPub->publish(green);
+      light_on = 0;
+    }
+
+    //ptrVelPub->publish(cmd);
+    cout<<"STOP - Target Reached!"<<endl;
+
+
+    }
 
   return 1;
 }
@@ -235,23 +297,24 @@ void chatterCallback(const accompany_uva_msg::TrackedHumans::ConstPtr& msg)
   {
     if (msg->trackedHumans[i].specialFlag == 1) //specialFlag indicate the most reliable tracked person.
     {
-      try // transform to map coordinate system
+      try // transform to robot egocentric coordinate frame (i.e. base_link)
       {
-        bool condition =  ptrListener->waitForTransform("/map",
+        //wait for /base_link to /camera_frame transform to be available for the specific time stamped
+        bool condition =  ptrListener->waitForTransform("/base_link",
                                       msg->trackedHumans[i].location.header.frame_id,
                                       msg->trackedHumans[i].location.header.stamp,
                                       ros::Duration(5.0));
-
-        ptrListener->transformPoint("/map",
+        //transform the tracked human's coordinate from /camera_frame to /base_link frame
+        ptrListener->transformPoint("/base_link",
                                 msg->trackedHumans[i].location,
                                 userPointInMap);
 
-        ROS_INFO("User is at (%f, %f)",userPointInMap.point.x, userPointInMap.point.y);
+        ROS_INFO("User is at (%f, %f) of the robot coordinate frame ",userPointInMap.point.x, userPointInMap.point.y);
 
-        Pose userPoseInMap(userPointInMap.point.x, userPointInMap.point.y, 0);
-        Pose robotPoseInMap(getRobotPose());
+        Pose userPoseInRobotFrame(userPointInMap.point.x, userPointInMap.point.y, 0);
+        Pose robotPoseInRobotFrame(0,0,0); //egocentric
 
-        iSeeYouSeeingMe(robotPoseInMap,userPoseInMap);
+        iSeeYouSeeingMe(robotPoseInRobotFrame,userPoseInRobotFrame);
 
       }
       catch (tf::TransformException e)
@@ -271,14 +334,21 @@ int main(int argc, char **argv)
   ros::NodeHandle n;
 
   ptrListener = new tf::TransformListener();
-
   ptrMoveBaseClient = new MoveBaseClient("move_base", true);
+
+  ptrSetLightModeClient = new SetLightModeClient("/light_controller/set_lightmode/",true);
 
   //wait for the action server to come up
   while(!ptrMoveBaseClient->waitForServer(ros::Duration(5.0))){
     ROS_INFO("Waiting for the move_base action server to come up");
   }
+  ros::Publisher VelPub = n.advertise<geometry_msgs::Twist>("/base_controller/command_safe",1);
   ros::Subscriber sub = n.subscribe("/trackedHumans", 1, chatterCallback); // stored only the most recent
+  ros::Publisher lightPub = n.advertise<std_msgs::ColorRGBA>("/light_controller/command",1);
+
+  ptrLightPub = &lightPub;
+  ptrVelPub = &VelPub;
+
 
   ros::spin();
 
