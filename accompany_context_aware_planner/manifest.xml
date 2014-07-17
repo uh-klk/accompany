@@ -20,8 +20,16 @@
   <depend package="move_base_msgs"/>
   <depend package="actionlib"/>
   <rosdep name="libmysqlclient-dev"/>
+
+  <depend package="sensor_msgs"/>
+  <depend package="trajectory_msgs"/>
+  <depend package="cob_srvs"/>
+  <depend package="brics_actuator"/>
+  <depend package="pr2_teleop"/>
+  <depend package="control_msgs"/>
   
   
+
 <!--  <export>
 #  <cpp lflags="-lmysqlclient"/>
 #  </export>

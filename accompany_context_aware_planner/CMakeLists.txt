@@ -46,5 +46,23 @@ rosbuild_add_executable(getPotentialProxemicsLocations ros/src/getPotentialProxe
 
 rosbuild_add_executable(getUserPose ros/src/getUserPose.cpp)
 
+rosbuild_add_executable(empathicBehaviour ros/src/empathicBehaviour.cpp 
+										  ros/src/CobLightControllerClient.cpp
+										  ros/src/CobBaseControllerClient.cpp
+										  ros/src/CobTorsoControllerClient.cpp)
+										  
+rosbuild_add_executable(test1 ros/src/test.cpp 
+							  ros/src/CobLightControllerClient.cpp)
+
+#rosbuild_add_executable(cob_teleop ros/src/cob_teleop.cpp)
+
+#rosbuild_add_executable(cobTorsoController ros/src/cobTorsoController.cpp)
+
+#rosbuild_add_executable(cobLightController ros/src/cobLightController.cpp)
+
+
+#rosbuild_add_executable(cobBaseController ros/src/cobBaseControllerClient.cpp)
+
 TARGET_LINK_LIBRARIES(accompany_context_aware_planner mysqlcppconn)
 TARGET_LINK_LIBRARIES(getUserPose mysqlcppconn)
+TARGET_LINK_LIBRARIES(empathicBehaviour mysqlcppconn)
