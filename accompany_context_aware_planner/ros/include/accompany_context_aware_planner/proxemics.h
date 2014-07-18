@@ -12,6 +12,9 @@
 #include <vector>
 #include <math.h>
 
+#include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
+
 // opencv
 #include <opencv/cv.h>
 #include <opencv/highgui.h>
@@ -62,6 +65,8 @@ public:
         = node_handle_.advertiseService("get_potential_proxemics_locations",
                                         &Proxemics::getPotentialProxemicsLocations, this);
 
+    potentialProxemicsPosePublisher = node_handle_.advertise<visualization_msgs::MarkerArray>("potentialProxemicsPose_marker_array", 0);
+
     ROS_INFO("Ready to provide potential proxemics based robot target pose.");
   }
 
@@ -82,8 +87,6 @@ public:
       distance = 0.0;
       orientation = 0.0;
     }
-
-
   };
 
   struct DistanceWithPriority
@@ -192,6 +195,8 @@ protected:
   ros::Subscriber static_map_sub_;
 
   ros::ServiceServer service_server_get_potential_proxemics_locations_; // Service server providing proxemics locations
+
+  ros::Publisher potentialProxemicsPosePublisher;
 
   double robotRadius; // in [m]
   double personRadius; // in [m]

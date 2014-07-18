@@ -188,8 +188,11 @@ float temp_orientation = 0;
 
 int validDataCount = 0;
 
+visualization_msgs::MarkerArray proxemicsMarkerArray;
+
 tf::Stamped<tf::Pose> p;
 geometry_msgs::PoseStamped pose; //create a PoseStamped variable to store the StampedPost TF
+geometry_msgs::PoseStamped poseTemp[21];
 
 Pose personLocation(req.userPose.position.x, req.userPose.position.y, tf::getYaw(req.userPose.orientation));
 
@@ -288,7 +291,9 @@ Pose personLocation(req.userPose.position.x, req.userPose.position.y, tf::getYaw
 
           //6. Compile the respond message for the client.
           tf::poseStampedTFToMsg(p, pose); //convert the PoseStamped data into message format and store in pose
+
           res.targetPoses.push_back(pose); //push the pose message into the respond vector to be send back to the client
+
 
           validDataCount++;
         }
@@ -343,6 +348,8 @@ Pose personLocation(req.userPose.position.x, req.userPose.position.y, tf::getYaw
                                                        tf::Point(targetPose.x, targetPose.y, 0.0)), ros::Time::now(), "map");
     tf::poseStampedTFToMsg(p, pose);    //Convert the PoseStamped data into message format and store in pose.
     res.targetPoses.push_back(pose);    //Store the pose in the respond message for the client.
+
+    poseTemp[0] = pose;
     validDataCount++;
   }
 
@@ -350,6 +357,42 @@ Pose personLocation(req.userPose.position.x, req.userPose.position.y, tf::getYaw
   {
     cout<<validDataCount<<" valid pose(s) found."<<endl;
     cout<<"Sending pose(s) out."<<endl;
+
+    ros::Time rosCurrentTime = ros::Time(0);
+
+    proxemicsMarkerArray.markers.resize(validDataCount);
+
+    for(unsigned int j=0; j < validDataCount; j++)
+    {
+      proxemicsMarkerArray.markers[j].header.frame_id = "map";
+      proxemicsMarkerArray.markers[j].header.stamp = rosCurrentTime;
+      proxemicsMarkerArray.markers[j].id = j;
+      proxemicsMarkerArray.markers[j].type = visualization_msgs::Marker::ARROW;
+      proxemicsMarkerArray.markers[j].action = visualization_msgs::Marker::ADD;
+
+      proxemicsMarkerArray.markers[j].pose= res.targetPoses[j].pose;
+      /*
+      proxemicsMarkerArray.markers[j].pose.position.x = ;
+      proxemicsMarkerArray.markers[j].pose.position.y = ;
+      proxemicsMarkerArray.markers[j].pose.position.z = ;
+
+      proxemicsMarkerArray.markers[j].pose.orientation.x = 0.0;
+      proxemicsMarkerArray.markers[j].pose.orientation.y = 0.0;
+      proxemicsMarkerArray.markers[j].pose.orientation.z = 0.0;
+      proxemicsMarkerArray.markers[j].pose.orientation.w = 1.0;
+      */
+
+      proxemicsMarkerArray.markers[j].scale.x = 0.3;
+      proxemicsMarkerArray.markers[j].scale.y = 0.1;
+      proxemicsMarkerArray.markers[j].scale.z = 0.1;
+
+      float colour = (j / (float)validDataCount) * 0.6 + 0.2;
+      proxemicsMarkerArray.markers[j].color.a = 1.0;
+      proxemicsMarkerArray.markers[j].color.r = colour;
+      proxemicsMarkerArray.markers[j].color.g = colour;
+      proxemicsMarkerArray.markers[j].color.b = colour;
+    }
+    potentialProxemicsPosePublisher.publish(proxemicsMarkerArray);
 
     delete result;
     delete stmt;

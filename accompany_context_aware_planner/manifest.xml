@@ -28,6 +28,8 @@
   <depend package="pr2_teleop"/>
   <depend package="control_msgs"/>
   
+  <depend package="visualization_msgs"/>
+  
   
 
 <!--  <export>
