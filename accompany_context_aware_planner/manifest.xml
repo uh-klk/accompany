@@ -29,7 +29,7 @@
   <depend package="control_msgs"/>
   
   <depend package="visualization_msgs"/>
-  
+  <depend package="cob_leg_detection"/>
   
 
 <!--  <export>

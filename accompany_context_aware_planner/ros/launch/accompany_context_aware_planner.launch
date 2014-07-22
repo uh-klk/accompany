@@ -15,7 +15,7 @@
   	<!-- MySQL server setting -->
 
   	<!-- UH Robot House -->
-  	<param name="DBHOST" 	value="tcp://147.197.165.241:3306" />
+  	<param name="DBHOST" 	value="tcp://10.0.1.56:3306" />
   	<param name="USER"		value="rhUser" />
   	<param name="PASSWORD"	value="waterloo" />
   	<param name="DATABASE"	value="AccompanyResources" />
