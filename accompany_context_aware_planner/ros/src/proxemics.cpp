@@ -1293,66 +1293,97 @@ bool Proxemics::validApproachPosition(Pose personLocation, Pose robotLocation, P
   //std::vector<cv::Vec4i> hierarchy;
   cv::Mat expanded_map_with_person_copy = expanded_map_with_person.clone();
   cv::findContours(expanded_map_with_person_copy, contours, CV_RETR_LIST, CV_CHAIN_APPROX_SIMPLE);
-
   // display found contours
   cv::drawContours(expanded_map_with_person, contours, -1, cv::Scalar(128, 128, 128, 128), 2);
+
+
   cv::circle(expanded_map_with_person, convertFromMeterToPixelCoordinates<cv::Point> (robotLocation), 3,
              cv::Scalar(100, 100, 100, 100), -1); //robot position
+
   cv::circle(expanded_map_with_person, potentialApproachPosePixel, 3, cv::Scalar(200, 200, 200, 200), -1); //approach position
+
   //cv::line(expanded_map_with_person, convertFromMeterToPixelCoordinates<cv::Point>(Pose(1.f,0.2f,0.f)), convertFromMeterToPixelCoordinates<cv::Point>(Pose(-1.f,0.2f,0.f)), cv::Scalar(0,0,0,0), 2);
   //cv::line(map_, convertFromMeterToPixelCoordinates<cv::Point>(Pose(1.f,0.2f,0.f)), convertFromMeterToPixelCoordinates<cv::Point>(Pose(-1.f,0.2f,0.f)), cv::Scalar(0,0,0,0), 2);
 
-//To Display the results
-/*
-  cv::imshow("contour areas", expanded_map_with_person);
 
+  //To Display the results
+  /*
+  cv::imshow("contour areas", expanded_map_with_person);
   cv::Mat expanded_map_with_person_flip;
   cv::flip(expanded_map_with_person, expanded_map_with_person_flip,0);
   cv::imshow("contour areas flip",expanded_map_with_person_flip);
-
   cv::waitKey(100);
-*/
+  */
 
   // Eliminate poses that could not be reach by the robot based on static map
   // i.e. check whether potentialApproachPose and robotLocation are in the same area (=same contour)
   int contourIndexRobot = -1;
   int contourIndexPotentialApproachPose = -1;
+
+  //check if robot pose and potential pose are in the same contour/region i.e. robot reachable potential pose
   for (unsigned int i = 0; i < contours.size(); i++)
   {
-    if (0 <= cv::pointPolygonTest(contours[i], convertFromMeterToPixelCoordinates<cv::Point2f> (potentialApproachPose),
-                                  false))
+    //pointPologonTest function determines whether the point is inside a contour, outside, or lies on an edge (or coincides with a vertex).
+    //It returns positive (inside), negative (outside), or zero (on an edge) value, correspondingly.
+    if (0 <= cv::pointPolygonTest(contours[i], convertFromMeterToPixelCoordinates<cv::Point2f> (potentialApproachPose), false))
       contourIndexPotentialApproachPose = i;
     if (0 <= cv::pointPolygonTest(contours[i], convertFromMeterToPixelCoordinates<cv::Point2f> (robotLocation), false))
       contourIndexRobot = i;
   }
   std::cout << "contourIndexPotentialApproachPose=" << contourIndexPotentialApproachPose << "  contourIndexRobot="
       << contourIndexRobot << std::endl;
+
+  //
   if (contourIndexRobot != contourIndexPotentialApproachPose || (contourIndexRobot == -1
-      && contourIndexPotentialApproachPose == -1))
+      && contourIndexPotentialApproachPose == -1)){
+    std::cout << "Robot cannot reach this potential approach location" << endl;
     return false;
+  }
 
   // Eliminate poses that are not in the same location as the user (i.e. user is in living room, therefore all potential robot poses have to be in the living room for HRI)
   // check whether there is an obstacle in direct line of sight between personLocation and potentialApproachPose
   double dx = personLocationPixel.x - potentialApproachPosePixel.x;
   double dy = personLocationPixel.y - potentialApproachPosePixel.y;
   double interpolationSteps = 0.;
-  if (dx >= dy) // normalize
+
+  //cout<<personLocationPixel.x <<" - "<< potentialApproachPosePixel.x <<"="<< dx<<endl;
+  //cout<<personLocationPixel.y <<" - "<< potentialApproachPosePixel.y <<"="<< dy<<endl;
+
+  //calculate a direct path from potential pose towards the user
+  if ((dx == 0) && (dy != 0))
   {
-    interpolationSteps = dx;
-    dy /= dx;
-    dx = 1.;
+    interpolationSteps = sqrt(dy*dy); //steps is always positive
+    dy = 1.0*(sqrt(dy*dy)/dy);        //direction to move towards the user's position
+  }
+  else if ((dy == 0) && (dx != 0))
+  {
+    interpolationSteps = sqrt(dx*dx);
+    dx = 1.0*(sqrt(dx*dx)/dx);
+  }
+  else if (sqrt(dx*dx) >= sqrt(dy*dy))
+  {
+    interpolationSteps = sqrt(dx*dx);
+    dy = dy/interpolationSteps;
+    dx = sqrt(dx*dx)/dx;
   }
   else
   {
-    interpolationSteps = dy;
-    dx /= dy;
-    dy = 1.;
+    interpolationSteps = sqrt(dy*dy);
+    dx = dx/interpolationSteps;
+    dy = sqrt(dy*dy)/dy;
   }
 
+  //check to make sure there is no obstacle along the way.
   for (int i = 0; i < interpolationSteps; i++)
   {
     if (map_.at<unsigned char> (potentialApproachPosePixel.y + i * dy, potentialApproachPosePixel.x + i * dx) == 0) // if there is an obstacle in line of sight (map(y,x)==0)
+    {
+      //cout<<static_cast<unsigned> (map_.at<unsigned char> (potentialApproachPosePixel.y + i * dy, potentialApproachPosePixel.x + i * dx))<<endl;
+      cout<<"Encountered obstacle"<<endl;
       return false;
+    }
+  //cout<<static_cast<unsigned> (map_.at<unsigned char> (potentialApproachPosePixel.y + i * dy, potentialApproachPosePixel.x + i * dx))<<endl;
+
   }
 
   return true;
@@ -1382,17 +1413,25 @@ void Proxemics::updateMapCallback(const nav_msgs::OccupancyGridConstPtr& map_msg
     }
   }
 
+  //display the map
+  /*
+  cv::Mat map_flip;
+  cv::flip(map_, map_flip, 0);
+  cv::imshow("map flip",map_flip);
+  cv::waitKey(100);
+  */
+
   // create the inflated map
   int iterations = (int)(robotRadius / map_resolution_);
   //std::cout << "iterations=" << iterations << std::endl;
   cv::erode(map_, expanded_map_, cv::Mat(), cv::Point(-1, -1), iterations);
 
-//  display maps
-/*
-    cv::imshow("blown up map", expanded_map_);
-    cv::imshow("map", map_);
-    cv::waitKey(10);
-*/
+  //  display maps
+  /*
+  cv::imshow("blown up map", expanded_map_);
+  cv::imshow("map", map_);
+  cv::waitKey(10);
+  */
 
   ROS_INFO("Map received.");
 }
