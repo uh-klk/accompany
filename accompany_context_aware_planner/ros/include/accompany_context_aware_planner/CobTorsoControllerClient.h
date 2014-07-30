@@ -12,6 +12,7 @@ public:
   UH_CobTorsoControllerClient(){}
   void init(void);
   void sendGoal(float, float, float);
+  void cancelAllPreviousGoals(void);
 
 private:
   ros::NodeHandle nh;

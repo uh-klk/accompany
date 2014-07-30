@@ -51,14 +51,15 @@ void UH_CobBaseControllerClient::changeRobotHeading(float deltaTheta)
   {
     float angularVel = 0.5*((sqrt(deltaTheta*deltaTheta))/degree2radian(180));
     //calculate the desire angular velocity --- might overshoot depending on the tracker refresh rate and robot battery charge
-
+    /*
     if ((angularVel < 0.3) && (angularVel >0.2))
       angularVel=0.3;
     else if ((angularVel<=0.2) && (angularVel>=0.1))
         angularVel=0.2;
     else if (angularVel< 0.1)
         angularVel=0.2;
-
+    */
+    angularVel = 0.4;
     cmd.angular.z = angularVel*(sqrt(deltaTheta*deltaTheta)/deltaTheta); ////calculate the desire direction
     ROS_INFO("%f", cmd.angular.z);
 

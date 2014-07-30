@@ -74,12 +74,19 @@ public:
        trackedHumanPoseInRobotFrame = laserTrackedData.pose;
        laserTrackedData.dataFlag = 0;
        cameraTrackedData.dataFlag = 0;
+       lastDataProcessed = ros::Time::now() + ros::Duration(3);
      }
      else if (cameraTrackedData.dataFlag == 1) {
        trackedHumanPoseInRobotFrame = cameraTrackedData.pose;
        laserTrackedData.dataFlag = 0;
        cameraTrackedData.dataFlag = 0;
+       lastDataProcessed = ros::Time::now() + ros::Duration(3);
      }
+     else if  (ros::Time::now() > lastDataProcessed ){ // no data detected for more than 3 second, stop the robot, TODO:: turn the robot back to its old (prior to tracking) pose.
+       trackedHumanPoseInRobotFrame = robotPoseInRobotFrame;
+       lastDataProcessed = ros::Time::now() + ros::Duration(24*60*60);
+     }
+
   }
 
   float calRobotRotationAngle(Pose robPose, Pose humPose)
@@ -194,9 +201,10 @@ private:
 
     TrackedData cameraTrackedData;
     TrackedData laserTrackedData;
+    ros::Time lastDataProcessed;
 
     int lightActivated; //flag to set the robot led to green when its facing the user
-    int torsoTargetDirection;      //user location relative to the based_link frame i.e. +ve is at left side, -ve is at the right side
+    int torsoDirection;      //user location relative to the based_link frame i.e. +ve is at left side, -ve is at the right side
     std_msgs::ColorRGBA blue, red, yellow, green, white;
 };
 
@@ -222,7 +230,9 @@ void EmpathicBehaviour::init()
   trackedHumanPoseInRobotFrame.orientation = 0.0;
 
   lightActivated = 0;
-  torsoTargetDirection = 0;
+  torsoDirection = 0;
+
+  lastDataProcessed = ros::Time::now();
 
   blue.r =0;     blue.g =0;    blue.b =1;      blue.a = 1;
   red.r =1;      red.g =0;     red.b =0;       red.a = 1;
@@ -235,6 +245,7 @@ int EmpathicBehaviour::ISeeYouSeeingMe(Pose robPoseInRobotFrame, Pose humPoseInR
 {
   float deltaTheta = 0;
   float distance = 9999;
+  int torsoTargetDirection = 0;
 
   geometry_msgs::Twist cmd;
 
@@ -244,44 +255,50 @@ int EmpathicBehaviour::ISeeYouSeeingMe(Pose robPoseInRobotFrame, Pose humPoseInR
   distance = calDistanceToHuman(robPoseInRobotFrame, humPoseInRobotFrame);
   cout<<"Distance = "<< distance <<", Angle = "<< radian2degree(deltaTheta) <<endl;
 
+  torsoTargetDirection = (int) (sqrt(deltaTheta*deltaTheta)/deltaTheta);
+
   //Torso
-  if (  (distance<=3.6) && ( (radian2degree(sqrt(deltaTheta*deltaTheta))<30)&&(radian2degree(sqrt(deltaTheta*deltaTheta))>5) ) && isRobotFree() )  {
-    ROS_INFO("Sending Torso command... %f", deltaTheta);
-
-    if (torsoTargetDirection == 0) { //front of the robot
-        torsoTargetDirection = sqrt(deltaTheta*deltaTheta)/deltaTheta;     //latest direction towards the user
-        torsoControllerClient.sendGoal(0, -1*torsoTargetDirection*0.15, 0); // -1 was used to switch the direction of the torso direction, since torso require -ve value to turn left instead of +ve like the base
-    }
-    else if (torsoTargetDirection != (sqrt(deltaTheta*deltaTheta)/deltaTheta)) { //if the torso is not facing the user then move
-        torsoTargetDirection = (sqrt(deltaTheta*deltaTheta)/deltaTheta);
-        torsoControllerClient.sendGoal(0, -1*torsoTargetDirection*0.15, 0); //torso -ve is to the left
-    }
+  if ((distance <= 3.6) &&
+      (radian2degree(sqrt(deltaTheta*deltaTheta)) > 5) &&
+      (torsoDirection != torsoTargetDirection) &&
+      isRobotFree())
+  {     //turn the torso to the torsoTargetDirection
+    ROS_INFO("Sending Torso command... %f", deltaTheta); //if the torso is not facing the user then move
+    //torsoControllerClient.cancelAllPreviousGoals();
+    torsoControllerClient.sendGoal(0, -1*torsoTargetDirection*0.2, 0); //torso -ve is to the left
+    torsoDirection = torsoTargetDirection;
   }
-  else if ( ( (distance>3.6) || (radian2degree(sqrt(deltaTheta*deltaTheta))<= 5) ) && isRobotFree() )  { // if user is outside social zone or infront of the robot
-    if (torsoTargetDirection != 0) {
+  else if (((distance>3.6) || (radian2degree(sqrt(deltaTheta*deltaTheta))<= 5) ) &&
+           (torsoDirection != 0) &&
+           isRobotFree())
+  { // if user is outside social zone or infront of the robot, turn the torso back to the front
       torsoTargetDirection = 0;
+      //torsoControllerClient.cancelAllPreviousGoals();
       torsoControllerClient.sendGoal(0.0,0.0,0.0);
-    }
+      torsoDirection = torsoTargetDirection;
   }
 
-  //turns toward the user when the user entered the robot's social zone and he is more than 10 degree off the robot's heading and when it is safe for the robot to do so.
-  if ( (distance <= 3.6) && (distance >=0.5) && ( radian2degree(sqrt(deltaTheta*deltaTheta) ) >= 30)  && isRobotFree())  {
-    if (lightActivated == 0)    {
-      lightActivated = 1;
+
+  //turns toward the user when the user enter the robot's social zone and is more than 10 degree off the robot's heading and it is safe for the robot to do so.
+  if ( (distance <= 3.6) && (distance >= 0.8) &&
+       (radian2degree(sqrt(deltaTheta*deltaTheta)) >= 18) && isRobotFree())
+  {
+    if (lightActivated == 0)
+    {
       lightControllerClient.setLight(red,2);
+      lightActivated = 1;
     }
     baseControllerClient.changeRobotHeading(deltaTheta);
-
-    ROS_INFO("RUNNING ROBOT");
+    ROS_INFO("ROBOT IS MOVING");
   }
-  else  {
+  else if ( (distance > 3.6) || (distance < 0.8) || (radian2degree(sqrt(deltaTheta*deltaTheta)) <  10) )
+  { //if user is outside of social space or too close to robot
     if (lightActivated == 1) { //future: wait for robot to stop then publish green LED
       lightControllerClient.setLight(green,1);
       lightActivated = 0;
-      //baseControllerClient.changeRobotHeading(0);
     }
-
-    cout<<"STOP - Target Reached! -I SEE YOU SEEING ME"<<endl;
+    baseControllerClient.changeRobotHeading(0);
+    cout<<"STOP - Target Reached/You are standing too close to me/You are out of my social space! -I SEE YOU SEEING ME"<<endl;
   }
 
   return 1;
@@ -299,39 +316,38 @@ void EmpathicBehaviour::HumansTrackerLaserCallback(const cob_leg_detection::Trac
   Pose closestUserPoseInRobotFrame(0, 0, 0);
 
   try { // transform to robot egocentric coordinate frame (i.e. base_link)
-
     //wait for /base_link to /map_frame transform to be available for the specific time stamped
     if (msg->trackedHumans.size() > 0) {
-
       if (ptrListener->waitForTransform("/base_link",
                                         msg->trackedHumans[0].location.header.frame_id,
                                         msg->trackedHumans[0].location.header.stamp,
-                                        ros::Duration(5.0))) {
-
-        for (unsigned int i = 0; i< msg->trackedHumans.size(); ++i) {
+                                        ros::Duration(5.0)))
+      {
+        for (unsigned int i = 0; i< msg->trackedHumans.size(); ++i)
+        {
           //transform the tracked human's coordinate from /map_frame to /base_link frame
           ptrListener->transformPoint("/base_link",
                                       msg->trackedHumans[i].location,
                                       userPointInBaseLink);
-
           userPoseInRobotFrame.x = userPointInBaseLink.point.x;
           userPoseInRobotFrame.y = userPointInBaseLink.point.y;
           userPoseInRobotFrame.orientation = 0;
 
           tempDistance = calDistanceToHuman(robotPoseInRobotFrame, userPoseInRobotFrame);
 
-          //find the closest person to the robot
-          if (tempDistance < min_dist) {
+          //find the closest detected person
+          if (tempDistance < min_dist)
+          {
             min_dist = tempDistance;
             closestUserPoseInRobotFrame = userPoseInRobotFrame;
           }
         }
 
-        if (min_dist<=1.5) { //todo: create a function to processs both data and run this if its >1.5
+        if (min_dist <= 1.8)  //and only use the closest laser tracked person if the person is less than 1.8m from the robot
+        {
           laserTrackedData.pose = closestUserPoseInRobotFrame;
           laserTrackedData.distanceToHuman = min_dist;
           laserTrackedData.dataFlag = 1;
-          //iSeeYouSeeingMe(robotPoseInRobotFrame,closestUserPoseInRobotFrame);
         }
       }
     }
@@ -375,16 +391,6 @@ void EmpathicBehaviour::HumansTrackerCallback(const accompany_uva_msg::TrackedHu
       catch (tf::TransformException e)
       {
         ROS_ERROR("Received an exception trying to transform user location from \"camera_frame\" to \"base_link\" : %s", e.what());
-        /*
-        if (lightActivated == 1) //future: wait for robot to stop then publish green LED
-        {
-          baseControllerClient.changeRobotHeading(0);
-          std_msgs::ColorRGBA green;
-          green.r=0;   green.g =1;     green.b =0;     green.a=1;
-          lightControllerClient.setLight(green,1);
-          lightActivated = 0;
-          cout<<"STOPPING THE ROBOT!"<<endl;
-         } */
       }
     }
   }
@@ -400,7 +406,7 @@ int main(int argc, char **argv)
 
   myEmpathicBehaviour.init();
 
-  ros::Rate r(10);
+  ros::Rate r(100);
   while (ros::ok()) {
 
     ros::spinOnce();

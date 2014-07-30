@@ -10,6 +10,11 @@ void UH_CobTorsoControllerClient::init()
 
 }
 
+void UH_CobTorsoControllerClient::cancelAllPreviousGoals()
+{
+  ptrMoveTorsoClient->cancelAllGoals();
+}
+
 void UH_CobTorsoControllerClient::sendGoal(float torso_lower_tilt, float torso_pan, float torso_upper_tilt)
 {
   control_msgs::FollowJointTrajectoryGoal goal;
@@ -43,6 +48,7 @@ void UH_CobTorsoControllerClient::sendGoal(float torso_lower_tilt, float torso_p
   else
     ROS_INFO("The torso failed to rotate for some reason");*/
 }
+
 
 /*
 
