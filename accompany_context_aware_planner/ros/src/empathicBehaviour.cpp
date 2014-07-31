@@ -82,11 +82,11 @@ public:
        cameraTrackedData.dataFlag = 0;
        lastDataProcessed = ros::Time::now() + ros::Duration(3);
      }
-     else if  (ros::Time::now() > lastDataProcessed ){ // no data detected for more than 3 second, stop the robot, TODO:: turn the robot back to its old (prior to tracking) pose.
-       trackedHumanPoseInRobotFrame = robotPoseInRobotFrame;
-       lastDataProcessed = ros::Time::now() + ros::Duration(24*60*60);
+     else if (ros::Time::now() > lastDataProcessed ){ //Using vel to drive the robot, therefore need to stop the robot else it keeps going after reaching the target.
+       trackedHumanPoseInRobotFrame = robotPoseInRobotFrame; // Therefore if no data was detected for more than 3 second, we setup the robot stop moving, TODO:: turn the robot back to its old (prior to tracking) pose.
+       lastDataProcessed = ros::Time::now() + ros::Duration(7*24*60*60); //The robot will not run this loop again until it has been reactivated.
+       cout<<"In Process Tracker - stop if "<<endl;
      }
-
   }
 
   float calRobotRotationAngle(Pose robPose, Pose humPose)
@@ -291,12 +291,11 @@ int EmpathicBehaviour::ISeeYouSeeingMe(Pose robPoseInRobotFrame, Pose humPoseInR
     baseControllerClient.changeRobotHeading(deltaTheta);
     ROS_INFO("ROBOT IS MOVING");
   }
-  else if ( (distance > 3.6) || (distance < 0.8) || (radian2degree(sqrt(deltaTheta*deltaTheta)) <  10) )
-  { //if user is outside of social space or too close to robot
-    if (lightActivated == 1) { //future: wait for robot to stop then publish green LED
-      lightControllerClient.setLight(green,1);
-      lightActivated = 0;
-    }
+  else if ( ((distance > 3.6) || (distance < 0.8) || (radian2degree(sqrt(deltaTheta*deltaTheta)) <  10)) && (lightActivated == 1) )
+  {
+    lightControllerClient.setLight(green,1);
+    lightActivated = 0;
+
     baseControllerClient.changeRobotHeading(0);
     cout<<"STOP - Target Reached/You are standing too close to me/You are out of my social space! -I SEE YOU SEEING ME"<<endl;
   }
@@ -311,6 +310,7 @@ void EmpathicBehaviour::HumansTrackerLaserCallback(const cob_leg_detection::Trac
   geometry_msgs::PointStamped userPointInBaseLink;
   float min_dist = 10; //10meter
   float tempDistance = 10;
+  laserTrackedData.dataFlag = 0;
 
   Pose userPoseInRobotFrame(0, 0, 0);
   Pose closestUserPoseInRobotFrame(0, 0, 0);
