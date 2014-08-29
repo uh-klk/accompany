@@ -140,7 +140,7 @@ public:
     con->setSchema("Accompany"); // select appropriate database schema
     stmt = con->createStatement(); // create a statement object
 
-    //determine if the current session user is in the Living Room
+    //determine if the robot is free
     sql = "SELECT value from Accompany.Sensors where sensorId = 1001";
     cout << sql << endl;
     result = stmt->executeQuery(sql);
@@ -149,7 +149,7 @@ public:
     {
       actualValue = result->getString("value");
 
-      if (! expValue.compare(actualValue))
+      if (! expValue.compare(actualValue)) //1 is free
       {
         cout<<"oneeeeeeeeeeee"<<endl;
         status = true;
