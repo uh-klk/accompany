@@ -143,9 +143,9 @@ bool Proxemics::getPotentialProxemicsLocations(
 
 
   //Process user's proxemics using ExceptionCase table - for user in sitting posture or for special cases regular proxemics implementation is not suitable
-  if(getPotentialProxemicsLocations_ExceptionCase(req,res) == true)
+  if(getPotentialProxemicsLocations_SensorBasedExceptionCase(req,res) == true)
   {
-    cout<<"Done processing ExceptionCase."<<endl;
+    cout<<"Done processing SensorBasedExceptionCase."<<endl;
   }
   else if (req.userPosture == 1) //standing
   {
@@ -413,7 +413,7 @@ Pose personLocation(req.userPose.position.x, req.userPose.position.y, tf::getYaw
 
 }
 
-bool Proxemics::getPotentialProxemicsLocations_ExceptionCase(accompany_context_aware_planner::GetPotentialProxemicsLocations::Request &req,
+bool Proxemics::getPotentialProxemicsLocations_SensorBasedExceptionCase(accompany_context_aware_planner::GetPotentialProxemicsLocations::Request &req,
                             accompany_context_aware_planner::GetPotentialProxemicsLocations::Response &res)
 {
   int userLocationId;
@@ -441,6 +441,7 @@ bool Proxemics::getPotentialProxemicsLocations_ExceptionCase(accompany_context_a
   if (result->next())
   {
     userLocationId = result->getInt("locationId");
+    cout<<userLocationId<<endl;
   }
   else
   {
@@ -479,14 +480,89 @@ bool Proxemics::getPotentialProxemicsLocations_ExceptionCase(accompany_context_a
      if (count == 0) // in the future we can use this location for non-sensor based ExceptionCaseProxemicsPose
      {
        cout<<"Sensor based proxemics were not found in ExceptionCaseProxemicsPose table, switching to general proxemics processing."<<endl;
-       SQL_error = true;
 
-       delete result;
-       delete stmt;
-       con->close();
-       delete con;
+       //Count how many location based  ExceptionCaseProxemicsPose entry at user's current location .
+       sql = "SELECT \
+                COUNT(e.environmentId) as `count` \
+              FROM \
+                ExceptionCaseProxemicsPose e \
+                INNER JOIN LocationBasedProxemicsPreferences p ON p.exceptionCaseProxemicsPoseId = e.exceptionCaseProxemicsPoseId \
+                INNER JOIN Locations l ON l.locationId = p.locationId \
+              WHERE \
+                l.locationId = ";
+        sql += to_string(userLocationId);
 
-       return false;
+        cout<<sql<<endl;
+        result = stmt->executeQuery(sql);
+        if (result->next())
+        {
+          count = result->getInt("count");
+          if (count == 0)
+          {
+            SQL_error = true;
+
+            delete result;
+            delete stmt;
+            con->close();
+            delete con;
+
+            return false;
+          }
+          else if (count >= 1)
+          {
+            sql = " SELECT \
+                       e.* \
+                    FROM \
+                      ExceptionCaseProxemicsPose e \
+                      INNER JOIN LocationBasedProxemicsPreferences p ON p.exceptionCaseProxemicsPoseId = e.exceptionCaseProxemicsPoseId \
+                      INNER JOIN Locations l ON l.locationId = p.locationId \
+                    WHERE \
+                      l.locationId = ";
+            sql += to_string(userLocationId);
+            cout<<sql<<endl;
+            result = stmt->executeQuery(sql);
+            if (result->next())
+            {
+              targetPose.x=result->getDouble("x");
+              targetPose.y=result->getDouble("y");
+              targetPose.orientation=degree2radian(result->getDouble("orientation"));
+              tf::Stamped<tf::Pose> p = tf::Stamped<tf::Pose>(tf::Pose(tf::createQuaternionFromYaw(targetPose.orientation),
+                                                                       tf::Point(targetPose.x, targetPose.y, 0.0)), ros::Time::now(), "map");
+              tf::poseStampedTFToMsg(p, pose);    //Convert the PoseStamped data into message format and store in pose.
+              res.targetPoses.push_back(pose);    //Store the pose in the respond message for the client.
+              cout<<"Done processing - Found location based proxemics."<<endl;
+
+              delete result;
+              delete stmt;
+              con->close();
+              delete con;
+
+              return true;
+            }
+          }
+          else {
+
+            SQL_error = true;
+
+            delete result;
+            delete stmt;
+            con->close();
+            delete con;
+
+            return false;
+          }
+        }
+        else {
+
+          SQL_error = true;
+
+          delete result;
+          delete stmt;
+          con->close();
+          delete con;
+
+          return false;
+        }
      }
      else if (count == 1) //Retrieve the ExceptionCaseProxemicsPose for the triggered Sensor at user current location.
      {
@@ -517,7 +593,6 @@ bool Proxemics::getPotentialProxemicsLocations_ExceptionCase(accompany_context_a
            res.targetPoses.push_back(pose);    //Store the pose in the respond message for the client.
            cout<<"Done processing - Found user triggering sensor based proxemics."<<endl;
          }
-
          else //in theory it should never reach "else" since we already found a matching with in the ExceptionCaseProxemicsPose table previously i.e. count == 1
          {
            cout<<"Sensor based proxemics were not found in ExceptionCaseProxemicsPose table, switching to general proxemics processing. report Error Code !1 -+- "<<endl;
@@ -1012,7 +1087,8 @@ void Proxemics::retrieveProxemicsPreferences_ranking(int userId, int robotGeneri
   bearingWithPriority = retrieveProxemicsPreferencesWithPriority(userId, robotGenericTaskId);
   if (SQL_error == true)
     return;
-  rankedBearing[0].distance = bearingWithPriority.distance.distance;
+  //rankedBearing[0].distance = bearingWithPriority.distance.distance;
+  rankedBearing[0].distance = bearingWithPriority.distance.distance + (personRadius + robotRadius);
   rankedBearing[0].orientation = bearingWithPriority.orientation.orientation;
 
   rankDistanceBasedPriority(bearingWithPriority.distance.priority, rankedBearing);
@@ -1085,13 +1161,50 @@ void Proxemics::rankDistanceBasedPriority( int distancePriority, Bearing* ranked
 
   int k = 1;
   float distance = 0;
+  float distanceValue[3];
+  //retrieves the RobotApproachDistance values
+  sql = "SELECT * FROM RobotApproachDistance";
+  result = stmt->executeQuery(sql);
+  for (i=0; i<=2; i++)
+  {
+    distanceValue[i] = 0;
+    if (result->next())
+    {
+      distanceValue[i] =  result->getDouble("distance");
+    }
+    else if (i == 0)
+      {
+        cout<<"Error executing "<<sql<<" statement."<<endl;
+        SQL_error = true;
+
+        delete result;
+        delete stmt;
+        con->close();
+        delete con;
+
+        return;
+      }
+      else
+      {
+        cout<<"Error retrieving (the "<<i<<"th) result from "<<sql<<" statement."<<endl;
+        SQL_error = true;
+
+        delete result;
+        delete stmt;
+        con->close();
+        delete con;
+
+        return;
+      }
+  }
 
   if (distancePriority == 1)
-    distance = 0.825; //read from database
+    distance = distanceValue[0]; //read from database
   else if (distancePriority == 2)
-    distance = 1.5;
+    distance = distanceValue[1];
   else if (distancePriority == 3)
-    distance = 2;
+    distance = distanceValue[2];
+
 
   //perform the first ranking cycle around the user's preferred distance, based on their preferred bearing( distance, orientation).
   if (rankedBearing[0].orientation == degree2radian(0)) //then check id 1, then check RobotApproachOrientation id 2, 3 or 3, 2 depending on user's handedness or current robot location //front
@@ -1104,7 +1217,8 @@ void Proxemics::rankDistanceBasedPriority( int distancePriority, Bearing* ranked
             if (procOrientationInfo[i].orientation != rankedBearing[0].orientation) //&& (procOrientationInfo[i].distance != rankedBearing[0].distance))
             {
               rankedBearing[k].orientation = procOrientationInfo[i].orientation;
-              rankedBearing[k].distance = distance;
+              //rankedBearing[k].distance = distance;
+              rankedBearing[k].distance = distance + (personRadius + robotRadius);
               k++;
             }
     //search for next bearing that fall on a different side
@@ -1115,7 +1229,8 @@ void Proxemics::rankDistanceBasedPriority( int distancePriority, Bearing* ranked
               if (procOrientationInfo[i].orientation != rankedBearing[0].orientation)
               {
                 rankedBearing[k].orientation = procOrientationInfo[i].orientation;
-                rankedBearing[k].distance = distance;
+                //rankedBearing[k].distance = distance;
+                rankedBearing[k].distance = distance + (personRadius + robotRadius);
                 k++;
               }
   }   //if user's preferred bearing is to the left side
@@ -1129,7 +1244,8 @@ void Proxemics::rankDistanceBasedPriority( int distancePriority, Bearing* ranked
               if (procOrientationInfo[i].orientation != rankedBearing[0].orientation)
               {
                 rankedBearing[k].orientation = procOrientationInfo[i].orientation;
-                rankedBearing[k].distance = distance;
+                //rankedBearing[k].distance = distance;
+                rankedBearing[k].distance = distance + (personRadius + robotRadius);
                 k++;
               }
     //search for next bearing that fall on the same side as the preferred bearing
@@ -1140,7 +1256,8 @@ void Proxemics::rankDistanceBasedPriority( int distancePriority, Bearing* ranked
             if (procOrientationInfo[i].orientation != rankedBearing[0].orientation) //&& (procOrientationInfo[i].distance != rankedBearing[0].distance))
             {
               rankedBearing[k].orientation = procOrientationInfo[i].orientation;
-              rankedBearing[k].distance = distance;
+              //rankedBearing[k].distance = distance;
+              rankedBearing[k].distance = distance + (personRadius + robotRadius);
               k++;
             }
   }   //if user's preferred bearing is to the right side
@@ -1154,7 +1271,8 @@ void Proxemics::rankDistanceBasedPriority( int distancePriority, Bearing* ranked
             if (procOrientationInfo[i].orientation != rankedBearing[0].orientation) //&& (procOrientationInfo[i].distance != rankedBearing[0].distance))
             {
               rankedBearing[k].orientation = procOrientationInfo[i].orientation;
-              rankedBearing[k].distance = distance;
+              //rankedBearing[k].distance = distance;
+              rankedBearing[k].distance = distance + (personRadius + robotRadius);
               k++;
             }
       //search for next bearing that fall on the different side as the preferred bearing
@@ -1165,7 +1283,8 @@ void Proxemics::rankDistanceBasedPriority( int distancePriority, Bearing* ranked
               if (procOrientationInfo[i].orientation != rankedBearing[0].orientation)
               {
                 rankedBearing[k].orientation = procOrientationInfo[i].orientation;
-                rankedBearing[k].distance = distance;
+                //rankedBearing[k].distance = distance;
+                rankedBearing[k].distance = distance + (personRadius + robotRadius);
                 k++;
               }
   }
@@ -1176,16 +1295,17 @@ void Proxemics::rankDistanceBasedPriority( int distancePriority, Bearing* ranked
     if (distancePriority != i) //if the orientation ranking haven't being done for this distance then do it
     {
       if (i == 1)
-        distance = 0.825; //read from database
+        distance = distanceValue[0]; //read from database
       else if (i == 2)
-        distance = 1.5;
+        distance = distanceValue[1];
       else if (i == 3)
-        distance = 2;
+        distance = distanceValue[2];
 
       for (int j=0; j<7; j++) //use the new rank list and replicate for other distances
          {
            rankedBearing[k].orientation = rankedBearing[k-7].orientation;
-           rankedBearing[k].distance = distance;
+           //rankedBearing[k].distance = distance;
+           rankedBearing[k].distance = distance + (personRadius + robotRadius);
            k++;
          }
     }

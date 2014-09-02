@@ -56,7 +56,7 @@ public:
 
     map_resolution_ = 0;
 
-    robotRadius = 0.6;          //need to manually change this variable based on the robot
+    robotRadius = 0.55;          //need to manually change this variable based on the robot
     personRadius = 0.2;
 
     static_map_sub_ = node_handle_.subscribe<nav_msgs::OccupancyGrid> ("/map", 1, &Proxemics::updateMapCallback, this);
@@ -157,7 +157,7 @@ public:
   bool getPotentialProxemicsLocations_Standing(accompany_context_aware_planner::GetPotentialProxemicsLocations::Request &req,
                                                accompany_context_aware_planner::GetPotentialProxemicsLocations::Response &res);
 
-  bool getPotentialProxemicsLocations_ExceptionCase(accompany_context_aware_planner::GetPotentialProxemicsLocations::Request &req,
+  bool getPotentialProxemicsLocations_SensorBasedExceptionCase(accompany_context_aware_planner::GetPotentialProxemicsLocations::Request &req,
                               accompany_context_aware_planner::GetPotentialProxemicsLocations::Response &res);
 
   float getUserRadius(float thetaInRadian, float halfShoulderWidth, float halfChestDepth);
