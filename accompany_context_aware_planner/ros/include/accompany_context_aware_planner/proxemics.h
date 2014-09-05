@@ -157,7 +157,7 @@ public:
   bool getPotentialProxemicsLocations_Standing(accompany_context_aware_planner::GetPotentialProxemicsLocations::Request &req,
                                                accompany_context_aware_planner::GetPotentialProxemicsLocations::Response &res);
 
-  bool getPotentialProxemicsLocations_SensorBasedExceptionCase(accompany_context_aware_planner::GetPotentialProxemicsLocations::Request &req,
+  bool getPotentialProxemicsLocations_ExceptionCase(accompany_context_aware_planner::GetPotentialProxemicsLocations::Request &req,
                               accompany_context_aware_planner::GetPotentialProxemicsLocations::Response &res);
 
   float getUserRadius(float thetaInRadian, float halfShoulderWidth, float halfChestDepth);

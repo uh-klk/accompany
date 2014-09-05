@@ -98,6 +98,12 @@ int main(int argc, char **argv)
   tf::pointTFToMsg(tf::Point(X, Y, 0.0), srv.request.userPose.position); //convertTF to Msg then store in the server request container
   srv.request.robotGenericTaskId = atoi(argv[6]); //int
 
+  ROS_INFO("Request is:  x=%f, y=%f, z=%f yaw = %f",
+              srv.request.userPose.position.x,
+              srv.request.userPose.position.y,
+              srv.request.userPose.position.z,
+              radian2degree(tf::getYaw(srv.request.userPose.orientation)));
+
   if (client.call(srv))
   {
     if (srv.response.targetPoses.size() == 0)
@@ -106,6 +112,7 @@ int main(int argc, char **argv)
     }
     else
     {
+      ROS_INFO("Server Response time is %2f, Size of target poses size is: %d", (ros::Time::now().toSec( )- srv.request.header.stamp.toSec()), srv.response.targetPoses.size());
       for (unsigned i = 0; i < srv.response.targetPoses.size(); i++)
       {
         /*
@@ -117,16 +124,16 @@ int main(int argc, char **argv)
          srv.response.targetPoses[i].pose.position.z
          */
 
-        ROS_INFO("Response target Poses size is: %d", srv.response.targetPoses.size());
 
+        /*
         ROS_INFO("Request is:  x=%f, y=%f, z=%f yaw = %f",
             srv.request.userPose.position.x,
             srv.request.userPose.position.y,
             srv.request.userPose.position.z,
-            radian2degree(tf::getYaw(srv.request.userPose.orientation)));
+            radian2degree(tf::getYaw(srv.request.userPose.orientation)));*/
 
         ROS_INFO("MsgSeq = %d, time =  %2f, coordinate frame = %s ",
-            srv.response.targetPoses[i].header.seq,
+            i,
             (ros::Time::now().toSec()-srv.response.targetPoses[i].header.stamp.toSec()),
             srv.response.targetPoses[i].header.frame_id.c_str());
 
@@ -140,8 +147,12 @@ int main(int argc, char **argv)
 
         if (gotoTarget(srv.response.targetPoses[i].pose.position.x, srv.response.targetPoses[i].pose.position.y,
                    tf::getYaw(srv.response.targetPoses[i].pose.orientation)) == true) //ignore other poses if robot reached current target.
+        {
+          ROS_INFO("Reached target. Time taken =  %2f, coordinate frame = %s ",
+                   (ros::Time::now().toSec()-srv.response.targetPoses[i].header.stamp.toSec()),
+                   srv.response.targetPoses[i].header.frame_id.c_str());
           i = srv.response.targetPoses.size();
-
+        }
       }
     }
   }

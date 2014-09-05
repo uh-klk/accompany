@@ -143,7 +143,7 @@ bool Proxemics::getPotentialProxemicsLocations(
 
 
   //Process user's proxemics using ExceptionCase table - for user in sitting posture or for special cases regular proxemics implementation is not suitable
-  if(getPotentialProxemicsLocations_SensorBasedExceptionCase(req,res) == true)
+  if(getPotentialProxemicsLocations_ExceptionCase(req,res) == true)
   {
     cout<<"Done processing SensorBasedExceptionCase."<<endl;
   }
@@ -413,7 +413,7 @@ Pose personLocation(req.userPose.position.x, req.userPose.position.y, tf::getYaw
 
 }
 
-bool Proxemics::getPotentialProxemicsLocations_SensorBasedExceptionCase(accompany_context_aware_planner::GetPotentialProxemicsLocations::Request &req,
+bool Proxemics::getPotentialProxemicsLocations_ExceptionCase(accompany_context_aware_planner::GetPotentialProxemicsLocations::Request &req,
                             accompany_context_aware_planner::GetPotentialProxemicsLocations::Response &res)
 {
   int userLocationId;
