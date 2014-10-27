@@ -6,6 +6,8 @@
 
 #include <cob_leg_detection/TrackedHumans.h>
 
+#include <vector>
+
 /* MySQL Connector/C++ specific headers */
 #include <cppconn/driver.h>
 #include <cppconn/connection.h>
@@ -63,6 +65,9 @@ public:
   EmpathicBehaviour(ros::NodeHandle n):nh(n){}
   void init();
   int ISeeYouSeeingMe(Pose robPoseInRobotFrame, Pose humPoseInRobotFrame);
+  void BaseMovement(float distance, float deltaTheta, int torsoTargetDirection, int Flag_IsRobotFree);
+  void TorsoMovement(float distance, float deltaTheta, int torsoTargetDirection, int Flag_IsRobotFree);
+  void RobotInitInt(float distance, float deltaTheta);
   void ProcessHumansTrackersData();
   void HumansTrackerCallback(const accompany_uva_msg::TrackedHumans::ConstPtr& msg);
   void HumansTrackerLaserCallback(const cob_leg_detection::TrackedHumans::ConstPtr& msg);
@@ -75,7 +80,7 @@ public:
      float d_x = humPose.x-robPose.x;
      float theta_tar = atan2(d_y, d_x);
 
-     std::cout<<radian2degree(theta_tar)<<endl;
+     //std::cout<<radian2degree(theta_tar)<<endl;
 
      return theta_tar;
   }
@@ -121,7 +126,7 @@ public:
 
     //determine if the robot is free
     sql = "SELECT value from Accompany.Sensors where sensorId = 1001";
-    cout << sql << endl;
+    //cout << sql << endl;
     result = stmt->executeQuery(sql);
 
     if (result->next())
@@ -130,12 +135,12 @@ public:
 
       if (! expValue.compare(actualValue)) //1 is free
       {
-        cout<<"Robot is Free"<<endl;
+        //cout<<"Robot is Free"<<endl;
         status = true;
       }
       else
       {
-        cout<<"Robot is Not Free"<<endl;
+        //cout<<"Robot is Not Free"<<endl;
         status = false;
       }
     }
@@ -162,6 +167,8 @@ private:
 
     //tf::TransformListener transformListener;
 
+    std::vector<ros::Time> timer_RobotInitInt;
+    int update_timer;
 
     tf::TransformListener *ptrListener;
 
@@ -178,6 +185,8 @@ private:
     TrackedData cameraTrackedData;
     TrackedData laserTrackedData;
     ros::Time lastDataProcessed;
+
+    ros::Time lastDatabaseUpdateTime;
 
     int lightActivated; //flag to set the robot led to green when its facing the user
     int torsoDirection;      //user location relative to the based_link frame i.e. +ve is at left side, -ve is at the right side
@@ -211,6 +220,8 @@ void EmpathicBehaviour::init()
 
   lastDataProcessed = ros::Time::now();
 
+  lastDatabaseUpdateTime = ros::Time::now();
+
   //Define LED colour
   blue.r = 0; blue.g = 0; blue.b = 1; blue.a = 1;
 
@@ -234,13 +245,52 @@ int EmpathicBehaviour::ISeeYouSeeingMe(Pose robPoseInRobotFrame, Pose humPoseInR
 
   deltaTheta = calRobotRotationAngle(robPoseInRobotFrame, humPoseInRobotFrame);
   distance = calDistanceToHuman(robPoseInRobotFrame, humPoseInRobotFrame);
-  cout<<"Distance = "<< distance <<", Angle = "<< radian2degree(deltaTheta) <<endl;
+  //cout<<"Distance = "<< distance <<", Angle = "<< radian2degree(deltaTheta) <<endl;
 
   torsoTargetDirection = (int) (sqrt(deltaTheta*deltaTheta)/deltaTheta);
 
   bool Flag_IsRobotFree = isRobotFree();
 
-  //Torso
+
+  TorsoMovement(distance, deltaTheta, torsoTargetDirection, Flag_IsRobotFree);
+
+  BaseMovement(distance, deltaTheta, torsoTargetDirection, Flag_IsRobotFree);
+
+  RobotInitInt(distance, deltaTheta);
+
+
+
+  return 1;
+}
+
+void EmpathicBehaviour::BaseMovement(float distance, float deltaTheta, int torsoTargetDirection, int Flag_IsRobotFree)
+{
+  //turns toward the user when the user enter the robot's social zone and is more than 10 degree off the robot's heading and it is safe for the robot to do so.
+   if ( (distance <= 3.6) && (distance >= 0.8) &&
+        (radian2degree(sqrt(deltaTheta*deltaTheta)) >= 5) && Flag_IsRobotFree)
+   {
+     if (lightActivated == 0)
+     {
+       lightControllerClient.setLight(red,2);
+       lightActivated = 1;
+     }
+     baseControllerClient.changeRobotHeading(deltaTheta);
+     //ROS_INFO("ROBOT IS MOVING");
+   }
+   else if ( ((distance > 3.6) || (distance < 0.8) || (radian2degree(sqrt(deltaTheta*deltaTheta)) <  5)) && (lightActivated == 1) )
+   {
+     lightControllerClient.setLight(green,1);
+     lightActivated = 0;
+
+     baseControllerClient.changeRobotHeading(0);
+     //cout<<"STOP - Target Reached/You are standing too close to me/You are out of my social space! -I SEE YOU SEEING ME"<<endl;
+   }
+}
+
+
+void EmpathicBehaviour::TorsoMovement(float distance, float deltaTheta, int torsoTargetDirection, int Flag_IsRobotFree)
+{
+    //Torso
   if ((distance <= 3.6) && (radian2degree(sqrt(deltaTheta*deltaTheta)) > 5) &&
       (torsoDirection != torsoTargetDirection) && Flag_IsRobotFree)
   { //turn the torso to the torsoTargetDirection
@@ -249,36 +299,56 @@ int EmpathicBehaviour::ISeeYouSeeingMe(Pose robPoseInRobotFrame, Pose humPoseInR
     torsoDirection = torsoTargetDirection;
   }
   else if (((distance>3.6) || (radian2degree(sqrt(deltaTheta*deltaTheta))<= 5) ) &&
-           (torsoDirection != 0) &&
-           isRobotFree())
+           (torsoDirection != 0) && Flag_IsRobotFree)
   { // if user is outside social zone or infront of the robot, turn the torso back to the front
       torsoTargetDirection = 0.0;
       torsoControllerClient.sendGoal(0.0,torsoTargetDirection,0.0);
       torsoDirection = torsoTargetDirection;
   }
 
-  //turns toward the user when the user enter the robot's social zone and is more than 10 degree off the robot's heading and it is safe for the robot to do so.
-  if ( (distance <= 3.6) && (distance >= 0.8) &&
-       (radian2degree(sqrt(deltaTheta*deltaTheta)) >= 5) && Flag_IsRobotFree)
+}
+
+
+void EmpathicBehaviour::RobotInitInt(float distance, float deltaTheta)
+{
+  int update_timer = ros::Time::now().toSec()-lastDatabaseUpdateTime.toSec();
+
+
+  //user is outside of social space, initialise variable
+  if ( (distance > 3.6) || (radian2degree(sqrt(deltaTheta*deltaTheta)) > 5) )
   {
-    if (lightActivated == 0)
+    timer_RobotInitInt.clear();
+    if (update_timer > 1)
     {
-      lightControllerClient.setLight(red,2);
-      lightActivated = 1;
+      //TODO::MYSQL entry to database
+      ROS_INFO("setFlag0000000000000000000000");
+      lastDatabaseUpdateTime = ros::Time::now();
     }
-    baseControllerClient.changeRobotHeading(deltaTheta);
-    ROS_INFO("ROBOT IS MOVING");
   }
-  else if ( ((distance > 3.6) || (distance < 0.8) || (radian2degree(sqrt(deltaTheta*deltaTheta)) <  5)) && (lightActivated == 1) )
-  {
-    lightControllerClient.setLight(green,1);
-    lightActivated = 0;
+  else
+    //if user is robot's in social space, store current time
+    if ( (distance <= 3.6)  && (radian2degree(sqrt(deltaTheta*deltaTheta)) < 5))
+    {
+      timer_RobotInitInt.push_back(ros::Time::now());
+      //if Timer_RobotInitiateInteraction.current time - initial zone time > 2 sec set flag, shift time by 1 step
+      if (timer_RobotInitInt.size()>2)
+      {
+        if ( ( (timer_RobotInitInt.back().toSec()-timer_RobotInitInt.front().toSec()) > 2 ) && (update_timer > 1) )
+        {
+          //cout<<timer_RobotInitInt.back().toSec()-timer_RobotInitInt.front().toSec();
+          //TODO::MYSQL entry to database
+          ROS_INFO("setFlag1111111111111111111111");
+          lastDatabaseUpdateTime = ros::Time::now();
 
-    baseControllerClient.changeRobotHeading(0);
-    cout<<"STOP - Target Reached/You are standing too close to me/You are out of my social space! -I SEE YOU SEEING ME"<<endl;
-  }
+        }
+      }
+    }
 
-  return 1;
+  while ( (timer_RobotInitInt.back().toSec() - timer_RobotInitInt.front().toSec()) > 2 )
+         {
+           timer_RobotInitInt.erase(timer_RobotInitInt.begin());
+           cout<<"Delete front entry."<<"size is "<<timer_RobotInitInt.size()<<endl;
+         }
 }
 
 void EmpathicBehaviour::ProcessHumansTrackersData()
@@ -305,6 +375,7 @@ void EmpathicBehaviour::ProcessHumansTrackersData()
           lastDataProcessed = ros::Time::now() + ros::Duration(7*24*60*60); //The robot will not run this loop again until new data is available.
           cout<<"In Process Tracker - stop if "<<endl;
         }
+
   }
 
 void EmpathicBehaviour::HumansTrackerLaserCallback(const cob_leg_detection::TrackedHumans::ConstPtr& msg)

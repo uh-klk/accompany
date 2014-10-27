@@ -54,7 +54,7 @@ void UH_CobBaseControllerClient::changeRobotHeading(float deltaTheta)
 
     cmd.angular.z = angularVel*(sqrt(deltaTheta*deltaTheta)/deltaTheta); ////calculate the desire direction
 
-    ROS_INFO("Rotational Velocity of the robot is %f", cmd.angular.z);
+   // ROS_INFO("Rotational Velocity of the robot is %f", cmd.angular.z);
 
   }
 
