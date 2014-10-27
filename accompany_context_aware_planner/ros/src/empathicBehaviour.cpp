@@ -63,31 +63,10 @@ public:
   EmpathicBehaviour(ros::NodeHandle n):nh(n){}
   void init();
   int ISeeYouSeeingMe(Pose robPoseInRobotFrame, Pose humPoseInRobotFrame);
+  void ProcessHumansTrackersData();
   void HumansTrackerCallback(const accompany_uva_msg::TrackedHumans::ConstPtr& msg);
   void HumansTrackerLaserCallback(const cob_leg_detection::TrackedHumans::ConstPtr& msg);
 
-  void ProcessHumansTrackersData()
-  { //check if laser got data and Laser detected people that is less or equal than 1.5m
-    //else check for vision got data and detected people between 1.5 and 3.6 m
-
-    if (laserTrackedData.dataFlag == 1) {
-       trackedHumanPoseInRobotFrame = laserTrackedData.pose;
-       laserTrackedData.dataFlag = 0;
-       cameraTrackedData.dataFlag = 0;
-       lastDataProcessed = ros::Time::now() + ros::Duration(3);
-     }
-     else if (cameraTrackedData.dataFlag == 1) {
-       trackedHumanPoseInRobotFrame = cameraTrackedData.pose;
-       laserTrackedData.dataFlag = 0;
-       cameraTrackedData.dataFlag = 0;
-       lastDataProcessed = ros::Time::now() + ros::Duration(3);
-     }
-     else if (ros::Time::now() > lastDataProcessed ){ //Using vel to drive the robot, therefore need to stop the robot else it keeps going after reaching the target.
-       trackedHumanPoseInRobotFrame = robotPoseInRobotFrame; // Therefore if no data was detected for more than 3 second, we setup the robot stop moving, TODO:: turn the robot back to its old (prior to tracking) pose.
-       lastDataProcessed = ros::Time::now() + ros::Duration(7*24*60*60); //The robot will not run this loop again until it has been reactivated.
-       cout<<"In Process Tracker - stop if "<<endl;
-     }
-  }
 
   float calRobotRotationAngle(Pose robPose, Pose humPose)
   {
@@ -151,21 +130,18 @@ public:
 
       if (! expValue.compare(actualValue)) //1 is free
       {
-        cout<<"oneeeeeeeeeeee"<<endl;
+        cout<<"Robot is Free"<<endl;
         status = true;
       }
       else
       {
-        cout<<"Zeeero"<<endl;
-        cout<<expValue<<" != "<<actualValue<<endl;
-
+        cout<<"Robot is Not Free"<<endl;
         status = false;
       }
     }
     else
     {
       cout<<"Error with the following statement: "<<sql<<endl;
-
       status = false;
     }
 
@@ -214,13 +190,14 @@ void EmpathicBehaviour::init()
   torsoControllerClient.init();
   baseControllerClient.init();
 
-  //omni-cam based humans tracker
+  //subscribe to omni-cam based humans tracker
   trackedHumansSubscriber = nh.subscribe("/trackedHumans", 1, &EmpathicBehaviour::HumansTrackerCallback, this); // stored only the most recent
-  //laser based humans tracker
+  //subscribe laser based humans tracker
   trackedHumansLaserSubscriber = nh.subscribe("/leg_detection/detected_humans_laser", 1, &EmpathicBehaviour::HumansTrackerLaserCallback, this); // stored only the most recent
 
-  ptrListener = new tf::TransformListener(); //Transform listerner for transforming user coordinate to robot's base_link
+  ptrListener = new tf::TransformListener(); //Transform listener for transforming user's coordinate to robot's base_link frame
 
+  //Initialisation
   robotPoseInRobotFrame.x = 0.0;
   robotPoseInRobotFrame.y = 0.0;
   robotPoseInRobotFrame.orientation = 0.0;
@@ -234,11 +211,16 @@ void EmpathicBehaviour::init()
 
   lastDataProcessed = ros::Time::now();
 
-  blue.r =0;     blue.g =0;    blue.b =1;      blue.a = 1;
-  red.r =1;      red.g =0;     red.b =0;       red.a = 1;
-  green.r=0;   green.g =1;     green.b =0;     green.a=1;
-  yellow.r =0.4; yellow.g =1;  yellow.b =0;    yellow.a =1;
-  white.r =0.3;  white.g =1;   white.b =0.3;   white.a =1;
+  //Define LED colour
+  blue.r = 0; blue.g = 0; blue.b = 1; blue.a = 1;
+
+  red.r = 1; red.g = 0; red.b = 0; red.a = 1;
+
+  green.r = 0; green.g = 1; green.b = 0; green.a = 1;
+
+  yellow.r = 0.4; yellow.g =1; yellow.b = 0; yellow.a = 1;
+
+  white.r = 0.3; white.g =1; white.b = 0.3; white.a = 1;
 }
 
 int EmpathicBehaviour::ISeeYouSeeingMe(Pose robPoseInRobotFrame, Pose humPoseInRobotFrame)
@@ -248,7 +230,6 @@ int EmpathicBehaviour::ISeeYouSeeingMe(Pose robPoseInRobotFrame, Pose humPoseInR
   int torsoTargetDirection = 0;
 
   geometry_msgs::Twist cmd;
-
   cmd.linear.x = cmd.linear.y = cmd.angular.z = 0;
 
   deltaTheta = calRobotRotationAngle(robPoseInRobotFrame, humPoseInRobotFrame);
@@ -257,14 +238,13 @@ int EmpathicBehaviour::ISeeYouSeeingMe(Pose robPoseInRobotFrame, Pose humPoseInR
 
   torsoTargetDirection = (int) (sqrt(deltaTheta*deltaTheta)/deltaTheta);
 
+  bool Flag_IsRobotFree = isRobotFree();
+
   //Torso
-  if ((distance <= 3.6) &&
-      (radian2degree(sqrt(deltaTheta*deltaTheta)) > 5) &&
-      (torsoDirection != torsoTargetDirection) &&
-      isRobotFree())
-  {     //turn the torso to the torsoTargetDirection
+  if ((distance <= 3.6) && (radian2degree(sqrt(deltaTheta*deltaTheta)) > 5) &&
+      (torsoDirection != torsoTargetDirection) && Flag_IsRobotFree)
+  { //turn the torso to the torsoTargetDirection
     ROS_INFO("Sending Torso command... %f", deltaTheta); //if the torso is not facing the user then move
-    //torsoControllerClient.cancelAllPreviousGoals();
     torsoControllerClient.sendGoal(0, -1*torsoTargetDirection*0.2, 0); //torso -ve is to the left
     torsoDirection = torsoTargetDirection;
   }
@@ -272,16 +252,14 @@ int EmpathicBehaviour::ISeeYouSeeingMe(Pose robPoseInRobotFrame, Pose humPoseInR
            (torsoDirection != 0) &&
            isRobotFree())
   { // if user is outside social zone or infront of the robot, turn the torso back to the front
-      torsoTargetDirection = 0;
-      //torsoControllerClient.cancelAllPreviousGoals();
-      torsoControllerClient.sendGoal(0.0,0.0,0.0);
+      torsoTargetDirection = 0.0;
+      torsoControllerClient.sendGoal(0.0,torsoTargetDirection,0.0);
       torsoDirection = torsoTargetDirection;
   }
 
-
   //turns toward the user when the user enter the robot's social zone and is more than 10 degree off the robot's heading and it is safe for the robot to do so.
   if ( (distance <= 3.6) && (distance >= 0.8) &&
-       (radian2degree(sqrt(deltaTheta*deltaTheta)) >= 18) && isRobotFree())
+       (radian2degree(sqrt(deltaTheta*deltaTheta)) >= 5) && Flag_IsRobotFree)
   {
     if (lightActivated == 0)
     {
@@ -291,7 +269,7 @@ int EmpathicBehaviour::ISeeYouSeeingMe(Pose robPoseInRobotFrame, Pose humPoseInR
     baseControllerClient.changeRobotHeading(deltaTheta);
     ROS_INFO("ROBOT IS MOVING");
   }
-  else if ( ((distance > 3.6) || (distance < 0.8) || (radian2degree(sqrt(deltaTheta*deltaTheta)) <  10)) && (lightActivated == 1) )
+  else if ( ((distance > 3.6) || (distance < 0.8) || (radian2degree(sqrt(deltaTheta*deltaTheta)) <  5)) && (lightActivated == 1) )
   {
     lightControllerClient.setLight(green,1);
     lightActivated = 0;
@@ -303,7 +281,31 @@ int EmpathicBehaviour::ISeeYouSeeingMe(Pose robPoseInRobotFrame, Pose humPoseInR
   return 1;
 }
 
-// /leg_detection/detected_humans_laser  cob_leg_detection/TrackedHumans
+void EmpathicBehaviour::ProcessHumansTrackersData()
+  { //TODO:: Only process laser data that its less or equal than 1.5m
+    //else use vision data if its between 1.5 and 3.6 m
+
+    if (laserTrackedData.dataFlag == 1)
+    {
+      trackedHumanPoseInRobotFrame = laserTrackedData.pose;
+      laserTrackedData.dataFlag = 0;
+      cameraTrackedData.dataFlag = 0;
+      lastDataProcessed = ros::Time::now() + ros::Duration(3);
+    }
+      else if (cameraTrackedData.dataFlag == 1)
+      {
+        trackedHumanPoseInRobotFrame = cameraTrackedData.pose;
+        laserTrackedData.dataFlag = 0;
+        cameraTrackedData.dataFlag = 0;
+        lastDataProcessed = ros::Time::now() + ros::Duration(3);
+      }
+        else if (ros::Time::now() > lastDataProcessed )//Using vel to drive the robot, therefore need to stop the robot else it keeps going after reaching the target.
+        {
+          trackedHumanPoseInRobotFrame = robotPoseInRobotFrame; // Therefore if no data was detected for more than 3 second, we setup the robot stop moving, TODO:: turn the robot back to its old (prior to tracking) pose.
+          lastDataProcessed = ros::Time::now() + ros::Duration(7*24*60*60); //The robot will not run this loop again until new data is available.
+          cout<<"In Process Tracker - stop if "<<endl;
+        }
+  }
 
 void EmpathicBehaviour::HumansTrackerLaserCallback(const cob_leg_detection::TrackedHumans::ConstPtr& msg)
 {
@@ -315,35 +317,39 @@ void EmpathicBehaviour::HumansTrackerLaserCallback(const cob_leg_detection::Trac
   Pose userPoseInRobotFrame(0, 0, 0);
   Pose closestUserPoseInRobotFrame(0, 0, 0);
 
-  try { // transform to robot egocentric coordinate frame (i.e. base_link)
-    //wait for /base_link to /map_frame transform to be available for the specific time stamped
-    if (msg->trackedHumans.size() > 0) {
+  try
+  { // transform to robot egocentric coordinate frame (i.e. base_link)
+    if (msg->trackedHumans.size() > 0)
+    {
+
+      //wait for transform from /base_link to /map_frame to be available
       if (ptrListener->waitForTransform("/base_link",
                                         msg->trackedHumans[0].location.header.frame_id,
                                         msg->trackedHumans[0].location.header.stamp,
                                         ros::Duration(5.0)))
       {
+        //Select the closest target to the robot
         for (unsigned int i = 0; i< msg->trackedHumans.size(); ++i)
         {
-          //transform the tracked human's coordinate from /map_frame to /base_link frame
+          //determine the tracked person's coordinate in /base_link frame
           ptrListener->transformPoint("/base_link",
                                       msg->trackedHumans[i].location,
                                       userPointInBaseLink);
+
           userPoseInRobotFrame.x = userPointInBaseLink.point.x;
           userPoseInRobotFrame.y = userPointInBaseLink.point.y;
           userPoseInRobotFrame.orientation = 0;
 
           tempDistance = calDistanceToHuman(robotPoseInRobotFrame, userPoseInRobotFrame);
 
-          //find the closest detected person
-          if (tempDistance < min_dist)
+          if (tempDistance < min_dist) //Stored the coordinate of the closest person
           {
             min_dist = tempDistance;
             closestUserPoseInRobotFrame = userPoseInRobotFrame;
           }
         }
 
-        if (min_dist <= 1.8)  //and only use the closest laser tracked person if the person is less than 1.8m from the robot
+        if (min_dist <= 1.8)  //only use the closest tracked person if they are 1.8m or less from the robot
         {
           laserTrackedData.pose = closestUserPoseInRobotFrame;
           laserTrackedData.distanceToHuman = min_dist;
@@ -352,8 +358,9 @@ void EmpathicBehaviour::HumansTrackerLaserCallback(const cob_leg_detection::Trac
       }
     }
   }
-  catch (tf::TransformException e) {
-    ROS_ERROR("Received an exception trying to transform user location from \"camera_frame\" to \"map\" : %s", e.what());
+  catch (tf::TransformException e)
+  {
+    ROS_ERROR("Received an exception trying to transform laserTracker person data from \"camera_frame\" to \"base_link\" : %s", e.what());
   }
 }
 
@@ -361,41 +368,38 @@ void EmpathicBehaviour::HumansTrackerCallback(const accompany_uva_msg::TrackedHu
 {
   geometry_msgs::PointStamped userPointInBaseLink;
 
+  //Search and processed the most reliable data of the detected human
   for (unsigned int i=0; i< msg->trackedHumans.size(); ++i)
   {
-    if (msg->trackedHumans[i].specialFlag == 1) //specialFlag indicate the most reliable tracked person.
+    if (msg->trackedHumans[i].specialFlag == 1) //specialFlag indicates the most reliable tracked person
     {
-      try // transform to robot egocentric coordinate frame (i.e. base_link)
+      try //process the data
       {
-        //wait for /base_link to /camera_frame transform to be available for the specific time stamped
+        //wait for transform from /base_link to /camera_frame to be available
         if (ptrListener->waitForTransform("/base_link",
                                           msg->trackedHumans[i].location.header.frame_id,
                                           msg->trackedHumans[i].location.header.stamp,
                                           ros::Duration(5.0)))
         {
-          //transform the tracked human's coordinate from /camera_frame to /base_link frame
+          //determine the tracked person's coordinate in /base_link frame
           ptrListener->transformPoint("/base_link",
                                       msg->trackedHumans[i].location,
                                       userPointInBaseLink);
-          //ROS_INFO("humansTrackerCallback_ after transform");
-          //ROS_INFO("User is at (%f, %f) of the robot coordinate frame ",userPointInMap.point.x, userPointInMap.point.y);
 
           Pose userPoseInRobotFrame(userPointInBaseLink.point.x, userPointInBaseLink.point.y, 0);
 
           cameraTrackedData.pose = userPoseInRobotFrame;
           cameraTrackedData.distanceToHuman = calDistanceToHuman(robotPoseInRobotFrame, userPoseInRobotFrame);
           cameraTrackedData.dataFlag = 1;
-          //iSeeYouSeeingMe(robotPoseInRobotFrame,userPoseInRobotFrame) ;//todo: create a function to processs both data and run this if its >1.5
         }
       }
       catch (tf::TransformException e)
       {
-        ROS_ERROR("Received an exception trying to transform user location from \"camera_frame\" to \"base_link\" : %s", e.what());
+        ROS_ERROR("Received an exception trying to transform cameraTracker person data from \"camera_frame\" to \"base_link\" : %s", e.what());
       }
     }
   }
 }
-
 
 int main(int argc, char **argv)
 {
@@ -408,13 +412,11 @@ int main(int argc, char **argv)
 
   ros::Rate r(100);
   while (ros::ok()) {
-
     ros::spinOnce();
     myEmpathicBehaviour.ProcessHumansTrackersData();
     myEmpathicBehaviour.ISeeYouSeeingMe(myEmpathicBehaviour.getRobotPoseInRobotFrame(), myEmpathicBehaviour.getTrackedHumanPoseInRobotFrame());
     r.sleep();
   }
-
 
   ros::spin();
 
