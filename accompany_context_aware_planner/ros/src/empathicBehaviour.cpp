@@ -256,7 +256,7 @@ int EmpathicBehaviour::ISeeYouSeeingMe(Pose robPoseInRobotFrame, Pose humPoseInR
 
   BaseMovement(distance, deltaTheta, torsoTargetDirection, Flag_IsRobotFree);
 
- // RobotInitInt(distance, deltaTheta);
+  RobotInitInt(distance, deltaTheta);
 
   return 1;
 }
@@ -281,7 +281,6 @@ void EmpathicBehaviour::BaseMovement(float distance, float deltaTheta, int torso
   }
 }
 
-
 void EmpathicBehaviour::TorsoMovement(float distance, float deltaTheta, int torsoTargetDirection, int Flag_IsRobotFree)
 {
 
@@ -300,7 +299,6 @@ void EmpathicBehaviour::TorsoMovement(float distance, float deltaTheta, int tors
 
 }
 
-
 void EmpathicBehaviour::RobotInitInt(float distance, float deltaTheta)
 {
   int update_timer = ros::Time::now().toSec()-lastDatabaseUpdateTime.toSec();
@@ -312,12 +310,12 @@ void EmpathicBehaviour::RobotInitInt(float distance, float deltaTheta)
     if (update_timer >= 1)      //only set the flag every 1 second
     {
       //TODO::MYSQL entry to database
-      ROS_INFO("setFlag0000000000000000000000");
+      ROS_INFO("set Robot Initiate Interaction Flag 0");
       lastDatabaseUpdateTime = ros::Time::now();
     }
   }
   else   //if user is robot's in social space, store current time
-    if ( (radian2degree(sqrt(deltaTheta*deltaTheta)) < 5))
+    if ((radian2degree(sqrt(deltaTheta*deltaTheta)) <= 5))
     {
       timer_RobotInitInt.push_back(ros::Time::now());
       //if Timer_RobotInitiateInteraction.current time - initial zone time > 2 sec set flag, shift time by 1 step
@@ -327,17 +325,17 @@ void EmpathicBehaviour::RobotInitInt(float distance, float deltaTheta)
         {
           //cout<<timer_RobotInitInt.back().toSec()-timer_RobotInitInt.front().toSec();
           //TODO::MYSQL entry to database
-          ROS_INFO("setFlag1111111111111111111111");
+          ROS_INFO("set Robot Initiate Interaction Flag 1");
           lastDatabaseUpdateTime = ros::Time::now();
+          while( (timer_RobotInitInt.back().toSec() - timer_RobotInitInt.front().toSec()) > 2 )
+          {
+            timer_RobotInitInt.erase(timer_RobotInitInt.begin());
+            cout<<"Delete entry that are over 2sec."<<"size is "<<timer_RobotInitInt.size()<<endl;
+          }
         }
       }
     }
-/*
-  while ( (timer_RobotInitInt.back().toSec() - timer_RobotInitInt.front().toSec()) > 2 )
-         {
-           timer_RobotInitInt.erase(timer_RobotInitInt.begin());
-           cout<<"Delete front entry."<<"size is "<<timer_RobotInitInt.size()<<endl;
-         }*/
+
 }
 
 void EmpathicBehaviour::ProcessHumansTrackersData()
