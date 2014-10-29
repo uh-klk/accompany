@@ -5,6 +5,7 @@ void UH_CobBaseControllerClient::init()
   ptrTransformListener = new tf::TransformListener();
 
   velPub = nh.advertise<geometry_msgs::Twist>("/base_controller/command_safe",10);  //for sending direct command to the base controller
+  //velPub = nh.advertise<geometry_msgs::Twist>("/base_controller/command",10);  //for sending direct command to the base controller
 
   ptrMoveBaseClient = new actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction>(nh,"move_base", true); //for sending goal action
 
