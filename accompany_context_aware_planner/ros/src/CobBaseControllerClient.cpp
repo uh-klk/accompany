@@ -4,8 +4,8 @@ void UH_CobBaseControllerClient::init()
 {
   ptrTransformListener = new tf::TransformListener();
 
-  velPub = nh.advertise<geometry_msgs::Twist>("/base_controller/command_safe",10);  //for sending direct command to the base controller
-  //velPub = nh.advertise<geometry_msgs::Twist>("/base_controller/command",10);  //for sending direct command to the base controller
+  //velPub = nh.advertise<geometry_msgs::Twist>("/base_controller/command_safe",10);  //for sending direct command to the base controller with safety
+  velPub = nh.advertise<geometry_msgs::Twist>("/base_controller/command",10);  //for sending direct command to the base controller without safety
 
   ptrMoveBaseClient = new actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction>(nh,"move_base", true); //for sending goal action
 
@@ -21,7 +21,7 @@ Pose UH_CobBaseControllerClient::getRobPose() //Calculate robot pose in map coor
   ROS_INFO("UH_CobBaseControllerClient::getRobPose()");
   tf::Stamped<tf::Pose> robotOrigin = tf::Stamped<tf::Pose>(tf::Pose(tf::createQuaternionFromYaw(0),
                                                                      tf::Point(0.0, 0.0, 0.0)),
-                                                            ros::Time(0)/*ros::Time::now()*/,
+                                                            ros::Time(0),
                                                             "base_link"); //base_link origin is the robot coordinate frame
   // create a PoseStamped variable to store the StampedPost TF
   geometry_msgs::PoseStamped map_frame; // create a map_frame to store robotOrigin in map frame
@@ -44,18 +44,27 @@ Pose UH_CobBaseControllerClient::getRobPose() //Calculate robot pose in map coor
 
 void UH_CobBaseControllerClient::changeRobotHeading(float deltaTheta)
 {
-  geometry_msgs::Twist cmd;
+  float angularVel = 0;
+  float absDeltaTheta = 0;
 
+  geometry_msgs::Twist cmd;
   cmd.linear.x = cmd.linear.y = cmd.angular.z = 0;
 
-  if (deltaTheta!=0)
+  absDeltaTheta = sqrt(deltaTheta*deltaTheta);
+
+  if (absDeltaTheta!=0)
   {
+    if (absDeltaTheta <= degree2radian(15))
+      angularVel = absDeltaTheta;
+    else
+      angularVel = 1.2 * absDeltaTheta;
 
-    float angularVel = degree2radian(180)*(sqrt(deltaTheta*deltaTheta)/degree2radian(180));
+    if (sqrt(angularVel*angularVel) > degree2radian(60)) //if absolute angularVel is larger
+      angularVel = degree2radian(60); //then cap the angularVel
 
-    cmd.angular.z = angularVel*(sqrt(deltaTheta*deltaTheta)/deltaTheta); ////calculate the desire direction
+    cmd.angular.z = angularVel*(absDeltaTheta/deltaTheta); ////calculate the desire direction
 
-   // ROS_INFO("Rotational Velocity of the robot is %f", cmd.angular.z);
+    ROS_INFO("Delta Theta is %f, and Rotational Velocity of the robot is %f", deltaTheta, cmd.angular.z);
 
   }
 
