@@ -65,9 +65,10 @@ public:
   ~EmpathicBehaviour(){};
   void init(ros::NodeHandle nodeHandle, string dbhost, string user, string password, string database);
   int ISeeYouSeeingMe(Pose robPoseInRobotFrame, Pose humPoseInRobotFrame);
-  void BaseMovement(float distance, float deltaTheta, int torsoTargetDirection, int Flag_IsRobotFree);
-  void TorsoMovement(float distance, float deltaTheta, int torsoTargetDirection, int Flag_IsRobotFree);
-  void RobotInitInt(float distance, float deltaTheta);
+  void BaseMovement(float distance, float deltaTheta, int Flag_IsRobotFree);
+  void TorsoMovement(float deltaTheta, int torsoTargetDirection, int Flag_IsRobotFree);
+  void ResetRobotInitInt(float deltaTheta);
+  void SetRobotInitInt(float deltaTheta);
   void SelectHumansTrackersData();
 
   void OmniCamBasedHumansTrackerCallback(const accompany_uva_msg::TrackedHumans::ConstPtr& msg);
@@ -119,9 +120,11 @@ public:
     ResultSet *result;
 
     driver = get_driver_instance();
-    con = driver->connect("tcp://localhost:3306", "rhUser", "waterloo"); // create a database connection using the Driver
+    //con = driver->connect("tcp://localhost:3306", "rhUser", "waterloo"); // create a database connection using the Driver
+    con = driver->connect(DBHOST, USER, PASSWORD); // create a database connection using the Driver
     con->setAutoCommit(0); // turn off the autocommit
-    con->setSchema("Accompany"); // select appropriate database schema
+    //con->setSchema("Accompany"); // select appropriate database schema
+    con->setSchema(DATABASE); // select appropriate database schema
     stmt = con->createStatement(); // create a statement object
 
     //determine if the robot is free
@@ -221,7 +224,6 @@ void EmpathicBehaviour::init(ros::NodeHandle nodeHandle, string dbhost, string u
   PASSWORD = password;
   DATABASE = database;
 
-
   lightControllerClient.init();
   torsoControllerClient.init();
   baseControllerClient.init();
@@ -257,30 +259,11 @@ void EmpathicBehaviour::init(ros::NodeHandle nodeHandle, string dbhost, string u
   lastDatabaseUpdateTime = ros::Time::now();
 
   //Define LED colour
-  blue.r = 0;
-  blue.g = 0;
-  blue.b = 1;
-  blue.a = 1;
-
-  red.r = 1;
-  red.g = 0;
-  red.b = 0;
-  red.a = 1;
-
-  green.r = 0;
-  green.g = 1;
-  green.b = 0;
-  green.a = 1;
-
-  yellow.r = 0.4;
-  yellow.g = 1;
-  yellow.b = 0;
-  yellow.a = 1;
-
-  white.r = 0.3;
-  white.g = 1;
-  white.b = 0.3;
-  white.a = 1;
+  blue.r = 0; blue.g = 0; blue.b = 1; blue.a = 1;
+  red.r = 1; red.g = 0; red.b = 0; red.a = 1;
+  green.r = 0; green.g = 1; green.b = 0; green.a = 1;
+  yellow.r = 0.4; yellow.g = 1; yellow.b = 0; yellow.a = 1;
+  white.r = 0.3; white.g = 1; white.b = 0.3; white.a = 1;
 }
 
 int EmpathicBehaviour::ISeeYouSeeingMe(Pose robPoseInRobotFrame, Pose humPoseInRobotFrame)
@@ -295,20 +278,20 @@ int EmpathicBehaviour::ISeeYouSeeingMe(Pose robPoseInRobotFrame, Pose humPoseInR
   deltaTheta = calRobotRotationAngle(robPoseInRobotFrame, humPoseInRobotFrame);
   distance = calDistanceToHuman(robPoseInRobotFrame, humPoseInRobotFrame);
 
-  torsoTargetDirection = (int)(sqrt(deltaTheta * deltaTheta) / deltaTheta);
+  torsoTargetDirection = (int)(sqrt(deltaTheta * deltaTheta) / deltaTheta); //get the direction in +1 or -1
 
   bool Flag_IsRobotFree = isRobotFree(); //check if scheduler has releasing control
 
-  TorsoMovement(distance, deltaTheta, torsoTargetDirection, Flag_IsRobotFree);
+  TorsoMovement(deltaTheta, torsoTargetDirection, Flag_IsRobotFree);
 
-  BaseMovement(distance, deltaTheta, torsoTargetDirection, Flag_IsRobotFree);
+  BaseMovement(distance, deltaTheta, Flag_IsRobotFree);
 
-  RobotInitInt(distance, deltaTheta);
+  SetRobotInitInt(deltaTheta);
 
   return 1;
 }
 
-void EmpathicBehaviour::BaseMovement(float distance, float deltaTheta, int torsoTargetDirection, int Flag_IsRobotFree)
+void EmpathicBehaviour::BaseMovement(float distance, float deltaTheta, int Flag_IsRobotFree)
 {
   //turns toward the user when the user enter the robot's social zone and is more than 10 degree off the robot's heading and it is safe for the robot to do so.
   if ((distance >= 0.8) && (radian2degree(sqrt(deltaTheta * deltaTheta)) >= 5) && Flag_IsRobotFree)
@@ -328,57 +311,96 @@ void EmpathicBehaviour::BaseMovement(float distance, float deltaTheta, int torso
   }
 }
 
-void EmpathicBehaviour::TorsoMovement(float distance, float deltaTheta, int torsoTargetDirection, int Flag_IsRobotFree)
+void EmpathicBehaviour::TorsoMovement(float deltaTheta, int torsoTargetDirection, int Flag_IsRobotFree)
 {
 
-  if ((radian2degree(sqrt(deltaTheta * deltaTheta)) > 5) && (torsoDirection != torsoTargetDirection)
-      && Flag_IsRobotFree)
+  if ((radian2degree(sqrt(deltaTheta * deltaTheta)) > 5) && (torsoDirection != torsoTargetDirection) && Flag_IsRobotFree)
   { //turn the torso to the torsoTargetDirection
     ROS_INFO("Sending Torso command... %f", deltaTheta); //if the torso is not facing the user then move
     torsoControllerClient.sendGoal(0, -1 * torsoTargetDirection * 0.4, 0); //torso -ve is to the left
     torsoDirection = torsoTargetDirection;
   }
-  else if ((radian2degree(sqrt(deltaTheta * deltaTheta)) <= 5) && (torsoDirection != 0) && Flag_IsRobotFree)
-  { // if user is outside social zone or infront of the robot, turn the torso back to the front
-    torsoTargetDirection = 0.0;
+  else if ( ((radian2degree(sqrt(deltaTheta * deltaTheta)) <= 5) && (torsoDirection != 0)) && Flag_IsRobotFree )
+  { // if user is in front of the robot, turn the torso to the front
+    torsoTargetDirection = 0;
     torsoControllerClient.sendGoal(0.0, torsoTargetDirection, 0.0);
     torsoDirection = torsoTargetDirection;
   }
 
 }
 
-void EmpathicBehaviour::RobotInitInt(float distance, float deltaTheta)
+void EmpathicBehaviour::ResetRobotInitInt(float deltaTheta)
 {
-  int update_timer = ros::Time::now().toSec() - lastDatabaseUpdateTime.toSec();
-
   //user is outside of social space, initialise variable
   if (radian2degree(sqrt(deltaTheta * deltaTheta)) > 5)
   {
     timer_RobotInitInt.clear(); //reset the moving window
-    if (update_timer >= 1) //only set the flag every 1 second
-    {
-      //TODO::MYSQL entry to database
-      ROS_INFO("set Robot Initiate Interaction Flag 0");
-      lastDatabaseUpdateTime = ros::Time::now();
-    }
+    Driver *driver;
+    Connection *con;
+    Statement *stmt;
+    string sql;
+
+    driver = get_driver_instance();
+    con = driver->connect(DBHOST, USER, PASSWORD); // create a database connection using the Driver
+    con->setAutoCommit(0); // turn off the autocommit
+    con->setSchema(DATABASE); // select appropriate database schema
+    stmt = con->createStatement(); // create a statement object
+
+    //MYSQL entry to database
+    //register the user is not interested to interact with the robot
+    ROS_INFO("set Robot Initiate Interaction Flag 0");
+    sql = "UPDATE Sensors SET value = '0' WHERE sensorId = 1002";
+    stmt->executeUpdate(sql);
+
+    delete stmt;
+    con->close();
+    delete con;
+    lastDatabaseUpdateTime = ros::Time::now();
   }
+}
+
+
+void EmpathicBehaviour::SetRobotInitInt(float deltaTheta)
+{
+  int update_timer = ros::Time::now().toSec() - lastDatabaseUpdateTime.toSec();
+
   //if user is robot's in social space, store current time
-  else if ((radian2degree(sqrt(deltaTheta * deltaTheta)) <= 5))
+  if ((radian2degree(sqrt(deltaTheta * deltaTheta)) <= 5))
   {
     timer_RobotInitInt.push_back(ros::Time::now()); //store current time in the moving window
+
     if (timer_RobotInitInt.size() > 2)
     {
       if (((timer_RobotInitInt.back().toSec() - timer_RobotInitInt.front().toSec()) > 2) && (update_timer > 1))
       {
+        Driver *driver;
+        Connection *con;
+        Statement *stmt;
+        string sql;
+
+        driver = get_driver_instance();
+        con = driver->connect(DBHOST, USER, PASSWORD); // create a database connection using the Driver
+        con->setAutoCommit(0); // turn off the autocommit
+        con->setSchema(DATABASE); // select appropriate database schema
+        stmt = con->createStatement(); // create a statement object
+
         //TODO::MYSQL entry to database
         ROS_INFO("set Robot Initiate Interaction Flag 1");
+        //register the user is interested to interact with the robot
+        sql = "UPDATE Sensors SET value = '1' WHERE sensorId = 1002";
+        stmt->executeUpdate(sql);
+
+        delete stmt;
+        con->close();
+        delete con;
+
         lastDatabaseUpdateTime = ros::Time::now();
 
         //delete all the old data that is more than 2 sec.
         while ((timer_RobotInitInt.back().toSec() - timer_RobotInitInt.front().toSec()) > 2)
         {
           timer_RobotInitInt.erase(timer_RobotInitInt.begin());
-          cout << "Delete entry that are over 2sec." << "size is " << timer_RobotInitInt.size() << endl;
+          //cout << "Delete entry that are over 2sec." << "size is " << timer_RobotInitInt.size() << endl;
         }
       }
     }
@@ -411,6 +433,11 @@ void EmpathicBehaviour::SelectHumansTrackersData()
     trackedHumanPoseInRobotFrame = robotPoseInRobotFrame; // Therefore if no data was detected for more than 3 second, we setup the robot stop moving, TODO:: turn the robot back to its old (prior to tracking) pose.
     lastDataProcessed = ros::Time::now() + ros::Duration(7 * 24 * 60 * 60); //The robot will not run this loop again until new data is available.
     cout << "In Process Tracker - stop if " << endl;
+
+    ResetRobotInitInt(180);  //reset robot initiated interaction since user is not being detected
+    TorsoMovement(0, 1, isRobotFree());
+
+
   }
 
 }
@@ -537,7 +564,6 @@ int main(int argc, char **argv)
   private_node_handle_.param("DATABASE",        DATABASE,       string("Accompany"));
 
   EmpathicBehaviour myEmpathicBehaviour;
-
   myEmpathicBehaviour.init(nodeHandle, DBHOST, USER, PASSWORD, DATABASE);
 
   //  robotInteractionZone = personalDistance + (personRadius + robotRadius);
